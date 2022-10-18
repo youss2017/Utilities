@@ -20,8 +20,8 @@
 #endif
 
 #ifndef LOGGER_DISABLE_LOGGING
-#define LOG(logLevel, x, ...) Logger::GetGlobalLogger().print(LogLevel::logLevel, __FILENAME__, __LINE__,  x, __VA_ARGS__)
-#define LOGLN(logLevel, x, ...) Logger::GetGlobalLogger().println(LogLevel::logLevel, __FILENAME__, __LINE__, x, __VA_ARGS__)
+#define LOG(logLevel, x, ...) ut::Logger::GetGlobalLogger().print(ut::LogLevel::logLevel, __FILENAME__, __LINE__,  x, __VA_ARGS__)
+#define LOGLN(logLevel, x, ...) ut::Logger::GetGlobalLogger().println(ut::LogLevel::logLevel, __FILENAME__, __LINE__, x, __VA_ARGS__)
 #else
 #define LOG(logLevel, x, ...)
 #define LOGLN(logLevel, x, ...)
