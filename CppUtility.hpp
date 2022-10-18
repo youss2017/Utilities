@@ -9,6 +9,7 @@
 #include <string>
 #include <cassert>
 #include <cstring>
+#include <chrono>
 
 // #define CPP_UTILITY_IMPLEMENTATION in one of your cpp files (only one)
 // #define LOGGER_DISABLE_LOGGING to disable logging
@@ -21,7 +22,6 @@
 
 #ifndef LOGGER_DISABLE_LOGGING
 #define LOG(logLevel, x, ...) ut::Logger::GetGlobalLogger().print(ut::LogLevel::logLevel, __FILENAME__, __LINE__,  x, __VA_ARGS__)
-#define LOGLN(logLevel, x, ...) ut::Logger::GetGlobalLogger().println(ut::LogLevel::logLevel, __FILENAME__, __LINE__, x, __VA_ARGS__)
 #else
 #define LOG(logLevel, x, ...)
 #define LOGLN(logLevel, x, ...)
@@ -29,11 +29,16 @@
 
 #ifdef CPP_UTILITY_IMPLEMENTATION
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
 #include <signal.h>
 #endif
 #include <signal.h>
+#include <regex>
+#include <filesystem>
+#include <cwctype>
+#include <mutex>
 #endif
 
 #ifdef CPP_UTILITY_IMPLEMENTATION
@@ -242,7 +247,7 @@ namespace ut
 	bool CreateEmptyFile(std::string_view path);
 
 	struct any {
-		enum type { Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float, Double, String };
+		enum type { Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float, Double, String, Ptr };
 		any(int8_t   e) { m_data.INT8 = e; m_type = Int8; }
 		any(int16_t   e) { m_data.INT16 = e; m_type = Int16; }
 		any(int32_t   e) { m_data.INT32 = e; m_type = Int32; }
@@ -251,10 +256,16 @@ namespace ut
 		any(uint16_t   e) { m_data.UINT16 = e; m_type = UInt16; }
 		any(uint32_t   e) { m_data.UINT32 = e; m_type = UInt32; }
 		any(uint64_t   e) { m_data.UINT64 = e; m_type = UInt64; }
+#ifdef _MSC_VER
+		// For DWORD
+		any(wchar_t e) { m_data.INT16 = e; m_type = Int16; }
+		any(unsigned long e) { m_data.UINT16 = e; m_type = UInt16; }
+#endif
 		any(float e) { m_data.FLOAT = e; m_type = Float; }
 		any(double e) { m_data.DOUBLE = e; m_type = Double; }
 		any(const char* e) { m_data.STRING = e; m_type = String; }
 		any(const std::string& e) { m_data.STRING = e.c_str(); m_type = String; }
+		any(void* e) { m_data.PTR = e; m_type = Ptr; }
 		inline type get_type() const { return m_type; }
 		inline int8_t get_int8() const { return m_data.INT8; }
 		inline int16_t get_int16() const { return m_data.INT16; }
@@ -267,6 +278,7 @@ namespace ut
 		inline float get_float() const { return m_data.FLOAT; }
 		inline double get_double() const { return m_data.DOUBLE; }
 		inline const char* get_string() const { return m_data.STRING; }
+		inline void* get_ptr() const { return m_data.PTR; }
 	private:
 		type m_type;
 		union {
@@ -281,6 +293,7 @@ namespace ut
 			float FLOAT;
 			double DOUBLE;
 			const char* STRING;
+			void* PTR;
 		} m_data;
 	};
 
@@ -293,7 +306,7 @@ namespace ut
 		INFO,
 		INFOBOLD,
 		WARNING,
-		ERROR
+		ERR
 	};
 
 	class Logger {
@@ -317,15 +330,29 @@ namespace ut
 				strftime(currentTime, 80, "[%Y/%m/%d %H:%M:%S %p", localtime(&rawTime));
 			}
 			std::string result = currentTime;
+			double timeSinceStart = double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - _start_timestamp).count()) * 1e-9;
 			result.reserve((size_t)(input.size() * 1.5));
-			if (FileName)
-				result += " | "s + FileName + ":"s + std::to_string(LineNumber);
-			switch (logLevel) {
-			case LogLevel::INFO: result += "  INFO   ]\t";  break;
-			case LogLevel::WARNING: result += "  WARNING]\t"; break;
-			case LogLevel::ERROR: result += "  ERROR  ]\t"; break;
-			default:
-				result += ", UNKNOWN]\t";
+			{
+				FileName = FileName ? FileName : ".";
+				char metadata[100];
+				switch (logLevel) {
+				case LogLevel::INFO:
+				case LogLevel::INFOBOLD:
+					sprintf(metadata, " (%.2fs) | %s:%03d %-7s] ", timeSinceStart, FileName, LineNumber, "INFO");
+					break;
+					sprintf(metadata, " (%.2fs) | %s:%03d %-7s] ", timeSinceStart, FileName, LineNumber, "INFO");
+					break;
+				case LogLevel::WARNING:
+					sprintf(metadata, " (%.2fs) | %s:%03d %-7s] ", timeSinceStart, FileName, LineNumber, "WARNING");
+					break;
+				case LogLevel::ERR:
+					sprintf(metadata, " (%.2fs) | %s:%03d %-7s] ", timeSinceStart, FileName, LineNumber, "ERROR");
+					break;
+				default:
+					sprintf(metadata, " (%.2fs) | %s:%03d %-7s] ", timeSinceStart, FileName, LineNumber, "UNKNOWN");
+					break;
+				}
+				result += metadata;
 			}
 			bool openbracket = false;
 			bool closebracket = false;
@@ -373,8 +400,7 @@ namespace ut
 						case any::Float: result += std::to_string(e.get_float()); break;
 						case any::Double: result += std::to_string(e.get_double()); break;
 						case any::String: result += e.get_string(); break;
-						default:
-							assert(0 && "Invalid Type");
+						case any::Ptr: result += std::to_string((uint64_t)e.get_ptr()); break;
 						}
 						openbracket = false;
 						argumentId = 0;
@@ -387,13 +413,8 @@ namespace ut
 					result += input[i];
 				}
 			}
+			result += "\n";
 			_internal_log(logLevel, result);
-		}
-
-		template<typename ... Arg>
-		void println(LogLevel logLevel, const char* FileName, int LineNumber, const std::string& input, Arg... arguments) {
-			print(logLevel, FileName, LineNumber, input, arguments...);
-			_internal_log(logLevel, "\n");
 		}
 
 		Logger& operator<<(const char* input) {
@@ -408,13 +429,17 @@ namespace ut
 
 	private:
 		void _internal_log(LogLevel logLevel, const std::string& input);
+		uint64_t _get_current_thread_id();
 
 	private:
 		int32_t _flags;
 		std::fstream _file_stream;
+		static std::chrono::steady_clock::time_point _start_timestamp;
 	};
 
 #ifdef CPP_UTILITY_IMPLEMENTATION
+	static std::mutex _console_lock;
+
 	std::string replace(std::string_view source, std::string_view find, std::string_view replace)
 	{
 		std::string result = source.data();
@@ -555,7 +580,7 @@ namespace ut
 	std::wstring ltrim(std::wstring_view source)
 	{
 		std::wstring s = source.data();
-		s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch)
+		s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](wchar_t ch)
 			{ return !std::isspace(ch); }));
 		return s;
 	}
@@ -563,7 +588,7 @@ namespace ut
 	std::wstring rtrim(std::wstring_view source)
 	{
 		std::wstring s = source.data();
-		s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
+		s.erase(std::find_if(s.rbegin(), s.rend(), [](wchar_t ch)
 			{ return !std::isspace(ch); })
 			.base(),
 			s.end());
@@ -868,7 +893,22 @@ namespace ut
 
 	void Logger::_internal_log(LogLevel logLevel, const std::string& output)
 	{
+		std::lock_guard<std::mutex> lock(_console_lock);
 		if (_flags & LOGGER_TYPE_CONSOLE) {
+#ifdef _WIN32
+			static HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+			switch (logLevel) {
+			case LogLevel::INFOBOLD:
+				SetConsoleTextAttribute(hStdOut, 15);
+				break;
+			case LogLevel::WARNING:
+				SetConsoleTextAttribute(hStdOut, 6);
+				break;
+			case LogLevel::ERR:
+				SetConsoleTextAttribute(hStdOut, 4);
+				break;
+			}
+#else
 			switch (logLevel) {
 			case LogLevel::INFOBOLD:
 				std::cout << "\033[1;47;35m";
@@ -876,21 +916,40 @@ namespace ut
 			case LogLevel::WARNING:
 				std::cout << "\x1B[33m";
 				break;
-			case LogLevel::ERROR:
+			case LogLevel::ERR:
 				std::cout << "\x1B[31m";
 				break;
 			}
+#endif
+#ifdef _WIN32
+			std::cout << output;
+			SetConsoleTextAttribute(hStdOut, 7);
+#else
 			std::cout << output << "\033[0m";
+#endif
 		}
-		if (_flags & LOGGER_TYPE_FILE)
+		if (_flags & LOGGER_TYPE_FILE) {
 			_file_stream << output;
+			_file_stream.flush();
+		}
 	}
 
 	void Logger::AddFileLogging(const char* FileName)
 	{
 		_file_stream = std::fstream(FileName, std::ios::out);
+		_flags |= LOGGER_TYPE_FILE;
 	}
 
+	uint64_t Logger::_get_current_thread_id()
+	{
+#ifdef _WIN32
+		return GetCurrentThreadId();
+#else
+#error "Not Implemented"
+#endif
+	}
+
+	std::chrono::steady_clock::time_point Logger::_start_timestamp = std::chrono::high_resolution_clock::now();
 
 #endif
 

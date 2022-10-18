@@ -1,4 +1,5 @@
 <h1>CPP Utilites</h1>
+<p>As of now some functionality have not been implemented yet for linux</p>
 <p>Note: Code structure is inspired by Nothings stb</p>
 <p>All code is cross platform</p>
 <hr/>
