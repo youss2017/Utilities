@@ -12,6 +12,8 @@ void test() {
 }
 
 int main() {
+	ut::Logger::GlobalLoggerOptions.IncludeDate = true;
+	ut::Logger::GlobalLoggerOptions.IncludeFileAndLine = false;
 	for (int i = 0; i < 5; i++) {
 		std::thread x(test);
 		x.detach();

@@ -64,7 +64,8 @@ namespace sw {
 		Any,
 		// binds to all interfaces and transmits through all of them
 		// the best option for a server
-		Broadcast
+		Broadcast,
+		CustomInterface
 	};
 
 	struct Endpoint {
