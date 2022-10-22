@@ -60,11 +60,10 @@ namespace sw {
 	enum class SocketInterface {
 		// 127.*.*.* packets only from your computer
 		Loopback,
-		// local network and internet
+		// Binds to all interfaces best option for server
 		Any,
-		// binds to all interfaces and transmits through all of them
-		// the best option for a server
-		Broadcast,
+		// You enter interface address in bind function
+		// ex: 127.0.0.1, 192.168.1.50
 		CustomInterface
 	};
 
@@ -121,7 +120,7 @@ namespace sw {
 		/// <param name="port"></param>
 		/// <param name="interfaceType"></param>
 		/// <returns></returns>
-		Socket& Bind(SocketInterface interfaceType, uint16_t port = 0);
+		Socket& Bind(SocketInterface interfaceType, uint16_t port = 0, const char* customInterface = nullptr);
 
 		/// <summary>
 		/// On failure throws exception
@@ -184,6 +183,8 @@ namespace sw {
 		/// </summary>
 		/// <returns>Socket Validatity</returns>
 		bool IsValid();
+
+		Socket& EnableBroadcast();
 
 		void WaitForData();
 		static void WaitForData(const std::vector<sw::Socket>& Connections);
@@ -431,7 +432,7 @@ namespace sw {
 	}
 
 	// Throws Exception on failure
-	Socket& Socket::Bind(SocketInterface interfaceType, uint16_t port)
+	Socket& Socket::Bind(SocketInterface interfaceType, uint16_t port, const char* customInterface)
 	{
 		sockaddr_in addr{};
 		switch (interfaceType)
@@ -442,8 +443,8 @@ namespace sw {
 		case SocketInterface::Any:
 			addr.sin_addr.s_addr = INADDR_ANY;
 			break;
-		case SocketInterface::Broadcast:
-			addr.sin_addr.s_addr = INADDR_BROADCAST;
+		case SocketInterface::CustomInterface:
+			addr.sin_addr.s_addr = inet_addr(customInterface);
 			break;
 		}
 		addr.sin_family = AF_INET;
@@ -495,8 +496,10 @@ namespace sw {
 
 	int32_t Socket::Send(const void* pData, int32_t size)
 	{
+		if (size == 0) return 0;
 		assert(mType == SocketType::TCP && "Must be TCP Socket to use Send Function()");
 		int32_t readBytes = ::send(mSocket, (const char*)pData, size, 0);
+		if (readBytes == 0) mIsConnected = false;
 		if (readBytes < 0)
 			mIsConnected = GetSocketConnectionStateFromError();
 		return readBytes;
@@ -504,16 +507,12 @@ namespace sw {
 
 	int32_t Socket::SendTo(const void* pData, int32_t size, const std::string& destIP, uint16_t destPort)
 	{
-		assert(mType != SocketType::TCP && "Must be UDP/RAW Socket to use Send Function()");
 		sockaddr_in dest{};
 		dest.sin_addr.s_addr = inet_addr(destIP.c_str());
 		dest.sin_family = AF_INET;
 		dest.sin_port = htons(destPort);
 		socklen_t len = sizeof(dest);
 		int sentBytes = ::sendto(mSocket, (const char*)pData, size, 0, (sockaddr*)&dest, len);
-		if (sentBytes < 0) {
-			mIsConnected = GetSocketConnectionStateFromError();
-		}
 		return sentBytes;
 	}
 
@@ -528,8 +527,6 @@ namespace sw {
 		dest.sin_port = htons(endpoint.mPort);
 		socklen_t len = sizeof(dest);
 		int32_t sentBytes = ::sendto(mSocket, (const char*)pData, size, 0, (sockaddr*)&dest, len);
-		if (sentBytes < 0)
-			mIsConnected = GetSocketConnectionStateFromError();
 		return sentBytes;
 	}
 
@@ -695,6 +692,13 @@ namespace sw {
 		ep.mAddress = inet_ntoa(GetIPAddress(false, false, true));
 		ep.mPort = port;
 		return ep;
+	}
+
+	Socket& Socket::EnableBroadcast()
+	{
+		int enabled = 1;
+		setsockopt(mSocket, SOL_SOCKET, SO_BROADCAST, (const char*)&enabled, sizeof(enabled));
+		return *this;
 	}
 
 #endif
