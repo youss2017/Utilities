@@ -214,6 +214,17 @@ namespace sw {
 		/// <returns>Check the IsConnected flag to determine if this is a valid connection.</returns>
 		Socket Accept();
 
+		/// <summary>
+		/// Joins multicast group
+		/// The multicast addresses are in the range 224.0.0.0 through 239.255.255.255.
+		/// From iana.org
+		/// This function must be called after Bind(...).
+		/// This function tells the kernel to listen packets from this group and send them
+		/// to your application.
+		/// NOTE: Throws exception on failure.
+		/// </summary>
+		void JoinMulticastGroup(const std::string& GroupAddress);
+
 		const Endpoint& GetEndpoint();
 
 		// Proper Disconnection.
@@ -243,14 +254,18 @@ namespace sw {
 
 		Socket& EnableBroadcast();
 
+		// Allows other applications to use this interface(ex loopback, any, etc...) and port combination.
+		// Must be called before Bind() or will not be effective.
+		Socket& EnableReuseAddr();
+
 		/// <summary>
 		/// Timeout is in milliseconds
 		/// </summary>
 		/// <param name="Connections"></param>
-		void WaitForData(uint64_t timeout);
-		static void WaitForData(const std::vector<sw::Socket>& Connections, uint64_t timeout);
-		static void WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, uint64_t timeout);
-		static void WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, uint64_t timeout);
+		void WaitForData(int32_t timeout);
+		static void WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout);
+		static void WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, int32_t timeout);
+		static void WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout);
 		static std::vector<NetworkAdapter> EnumerateNetworkAdapters();
 
 		inline bool IsBlocking() {
@@ -621,7 +636,7 @@ namespace sw {
 		return mSocket > 0;
 	}
 
-	void Socket::WaitForData(uint64_t timeout)
+	void Socket::WaitForData(int32_t timeout)
 	{
 		WSAPOLLFD fdArray{};
 		fdArray.fd = mSocket;
@@ -629,7 +644,7 @@ namespace sw {
 		::WSAPoll(&fdArray, 1, timeout);
 	}
 
-	void Socket::WaitForData(const std::vector<sw::Socket>& Connections, uint64_t timeout)
+	void Socket::WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout)
 	{
 		if (Connections.size() == 0)
 			return;
@@ -640,15 +655,15 @@ namespace sw {
 		for (int i = 0; i < Connections.size(); i++) {
 			fdArray[i].fd = Connections[i].mSocket;
 			fdArray[i].events = POLLRDNORM;
-	}
-		::WSAPoll(fdArray, (ULONG)Connections.size(), timeout);
+		}
+		::WSAPoll(fdArray, (uint32_t)Connections.size(), timeout);
 #else
 #error "Not supported"
 #endif
 		_freea(fdArray);
 	}
 
-	void Socket::WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, uint64_t timeout)
+	void Socket::WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, int32_t timeout)
 	{
 		if (Connections.size() == 0)
 			return;
@@ -659,7 +674,7 @@ namespace sw {
 		for (int i = 0; i < Connections.size(); i++) {
 			fdArray[i].fd = Connections[i]->SockFd();
 			fdArray[i].events = POLLRDNORM;
-	}
+		}
 		::WSAPoll(fdArray, (ULONG)Connections.size(), timeout);
 #else
 #error "Not supported"
@@ -667,7 +682,7 @@ namespace sw {
 		_freea(fdArray);
 	}
 
-	void Socket::WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, uint64_t timeout)
+	void Socket::WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout)
 	{
 		if (Connections.size() == 0)
 			return;
@@ -678,7 +693,7 @@ namespace sw {
 		for (int i = 0; i < Connections.size(); i++) {
 			fdArray[i].fd = Connections[i]->SockFd();
 			fdArray[i].events = POLLRDNORM;
-	}
+		}
 		::WSAPoll(fdArray, (ULONG)Connections.size(), timeout);
 #else
 #error "Not supported"
@@ -720,7 +735,7 @@ namespace sw {
 			while (ipAddrs) {
 				std::string ip = ipAddrs->IpAddress.String;
 				std::string mask = ipAddrs->IpMask.String;
-				
+
 				auto extractIpFromString = [](const std::string ip, uint8_t output[4]) {
 					size_t ip_d0 = ip.find(".", 0);
 					size_t ip_d1 = ip.find(".", ip_d0 + 1);
@@ -766,15 +781,34 @@ namespace sw {
 			}
 			result.push_back(na);
 			adapterInfo = adapterInfo->Next;
-			}
+		}
 		// delete[] adapterInfo;
 #else
 #error "Not Implemented"
 #endif
 		return result;
+	}
+
+	Socket& Socket::EnableReuseAddr()
+	{
+		const int enable = 1;
+		if (setsockopt(mSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int)) < 0) {
+			throw std::runtime_error("Could not enable Reuse Addr.");
 		}
+		return *this;
+	}
+
+	void Socket::JoinMulticastGroup(const std::string& GroupAddress)
+	{
+		struct ip_mreq mreq;
+		mreq.imr_multiaddr.s_addr = ::inet_addr(GroupAddress.c_str());
+		mreq.imr_interface.s_addr = ::htonl(INADDR_ANY);
+		if (setsockopt(mSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
+			throw std::runtime_error("Failed to join multicast group.");
+		}
+	}
 
 
 #endif
 
-	}
+}
