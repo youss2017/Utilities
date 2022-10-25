@@ -5,23 +5,25 @@
 #include <windows.h>
 #include <iostream>
 
-#define MULITCAST_GROUP "239.211.208.140"
+#define MULITCAST_GROUP "239.5.6.8"
 #define MULTICAST_PORT 2500
 
 void simple_multicast_sender() {
 	sw::Startup();
 	sw::Socket sender(sw::SocketType::UDP);
+	sender.Bind(sw::SocketInterface::Any, 10000).SetMulticastLoopOption(false);
 	while (true) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(250));
 		std::string msg = "Hello! " + std::to_string(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 		sender.SendTo(msg.c_str(), msg.size(), MULITCAST_GROUP, MULTICAST_PORT);
+		sender.SendTo(msg.c_str(), msg.size(), MULITCAST_GROUP, 2501);
 	}
 }
 
 void simple_multicast_listener() {
 	sw::Startup();
 	sw::Socket lister(sw::SocketType::UDP);
-	lister.Bind(sw::SocketInterface::Any, MULTICAST_PORT).JoinMulticastGroup(MULITCAST_GROUP);
+	lister.Bind(sw::SocketInterface::Any, MULTICAST_PORT).JoinMulticastGroup(MULITCAST_GROUP).SetMulticastLoopOption(false);
 	while (true) {
 		char buf[256]{};
 		sw::Endpoint source;
