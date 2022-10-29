@@ -348,11 +348,11 @@ namespace ut
 				FileName = FileName ? FileName : ".";
 				char metadata[256];
 				char fileAndNumber[125]{};
-				
+
 				if (_options.IncludeFileAndLine) {
 					sprintf(fileAndNumber, " %s:%03d", FileName, LineNumber);
 				}
-				
+
 				switch (logLevel) {
 				case LogLevel::INFO:
 				case LogLevel::INFOBOLD:
@@ -374,7 +374,10 @@ namespace ut
 			}
 			bool openbracket = false;
 			bool closebracket = false;
+			bool formatSpecifier = false;
 			int argumentId = 0;
+			char argumentFormatSpecifier[30]{};
+			int formatSpecifierIndex = 0;
 			for (int i = 0; i < input.size(); i++) {
 				if (input[i] == '{') {
 					openbracket = !openbracket;
@@ -384,6 +387,16 @@ namespace ut
 				if (input[i] == '}' && !openbracket) {
 					closebracket = !closebracket;
 					if (!closebracket) result += "}";
+					continue;
+				}
+				if (input[i] == ':' && openbracket) {
+					formatSpecifier = true;
+					formatSpecifierIndex = 0;
+					memset(argumentFormatSpecifier, 0, sizeof(argumentFormatSpecifier));
+					continue;
+				}
+				if (formatSpecifier && openbracket && input[i] != '}') {
+					argumentFormatSpecifier[formatSpecifierIndex++] = input[i];
 					continue;
 				}
 				if (openbracket) {
@@ -406,22 +419,58 @@ namespace ut
 					case '9': argumentId = argumentId * 10 + 9; break;
 					case '}': {
 						auto& e = vec[argumentId];
-						switch (e.get_type()) {
-						case any::Int8: result += std::to_string(e.get_int8()); break;
-						case any::Int16: result += std::to_string(e.get_int16()); break;
-						case any::Int32: result += std::to_string(e.get_int32()); break;
-						case any::Int64: result += std::to_string(e.get_int64()); break;
-						case any::UInt8: result += std::to_string(e.get_uint8()); break;
-						case any::UInt16: result += std::to_string(e.get_uint16()); break;
-						case any::UInt32: result += std::to_string(e.get_uint32()); break;
-						case any::UInt64: result += std::to_string(e.get_uint64()); break;
-						case any::Float: result += std::to_string(e.get_float()); break;
-						case any::Double: result += std::to_string(e.get_double()); break;
-						case any::String: result += e.get_string(); break;
-						case any::Ptr: result += std::to_string((uint64_t)e.get_ptr()); break;
+						std::string argument_output;
+
+#define set_argument_output(type) \
+						{\
+							if (formatSpecifier) {\
+								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, type);\
+								argument_output.resize(nbytes);\
+								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, type);\
+							}\
+							else\
+								argument_output = std::to_string(type);\
+							break;\
 						}
+
+						switch (e.get_type()) {
+						case any::Int8: set_argument_output(e.get_int8());
+						case any::Int16: set_argument_output(e.get_int16());
+						case any::Int32: set_argument_output(e.get_int32());
+						case any::Int64: set_argument_output(e.get_int64());
+
+						case any::UInt8: set_argument_output(e.get_uint8());
+						case any::UInt16: set_argument_output(e.get_uint16());
+						case any::UInt32: set_argument_output(e.get_uint32());
+						case any::UInt64: set_argument_output(e.get_uint64());
+
+						case any::Float: set_argument_output(e.get_float());
+						case any::Double: set_argument_output(e.get_double());
+						case any::String: {
+							if (formatSpecifier) {
+								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_string());
+								argument_output.resize(nbytes);
+								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_string());
+							}
+							else
+								argument_output = e.get_string();
+							break;
+						}
+						case any::Ptr: {
+							if (!formatSpecifier) {
+								strcat(argumentFormatSpecifier, "%p");
+							}
+							size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_float());
+							argument_output.resize(nbytes);
+							snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_float());
+							break;
+						}
+						}
+						result += argument_output;
 						openbracket = false;
 						argumentId = 0;
+						formatSpecifier = false;
+#undef set_argument_output
 						break;
 					}
 					default: openbracket = false;
@@ -869,7 +918,7 @@ namespace ut
 #else
 		raise(SIGTRAP);
 #endif
-}
+	}
 
 	void ShowInfoBox(std::string_view title, std::string_view text)
 	{
@@ -941,7 +990,7 @@ namespace ut
 			case LogLevel::ERR:
 				std::cout << "\x1B[31m";
 				break;
-			}
+					}
 #endif
 #ifdef _WIN32
 			std::cout << output;
@@ -949,12 +998,12 @@ namespace ut
 #else
 			std::cout << output << "\033[0m";
 #endif
-		}
+					}
 		if (_options.LoggerType & LOGGER_TYPE_FILE) {
 			_file_stream << output;
 			_file_stream.flush();
 		}
-	}
+				}
 
 	void Logger::AddFileLogging(const char* FileName)
 	{
@@ -976,4 +1025,4 @@ namespace ut
 
 #endif
 
-}
+			}
