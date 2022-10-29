@@ -334,10 +334,10 @@ namespace ut
 			{
 				time_t rawTime = time(NULL);
 				if (Options.IncludeDate) {
-					strftime(currentTime, 80, "[%Y/%m/%d %H:%M:%S %p", localtime(&rawTime));
+					strftime(currentTime, 80, "%Y/%m/%d %H:%M:%S %p", localtime(&rawTime));
 				}
 				else {
-					strftime(currentTime, 80, "[%H:%M:%S %p", localtime(&rawTime));
+					strftime(currentTime, 80, "%H:%M:%S %p", localtime(&rawTime));
 				}
 			}
 			std::string result = currentTime;
@@ -356,18 +356,18 @@ namespace ut
 				switch (logLevel) {
 				case LogLevel::INFO:
 				case LogLevel::INFOBOLD:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "INFO");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "INFO");
 					break;
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "INFO");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "INFO");
 					break;
 				case LogLevel::WARNING:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "WARNING");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "WARNING");
 					break;
 				case LogLevel::ERR:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "ERROR");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "ERROR");
 					break;
 				default:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "UNKNOWN");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "UNKNOWN");
 					break;
 				}
 				result += metadata;
