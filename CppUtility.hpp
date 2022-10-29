@@ -333,7 +333,7 @@ namespace ut
 			char currentTime[80]{};
 			{
 				time_t rawTime = time(NULL);
-				if (_options.IncludeDate) {
+				if (Options.IncludeDate) {
 					strftime(currentTime, 80, "[%Y/%m/%d %H:%M:%S %p", localtime(&rawTime));
 				}
 				else {
@@ -349,7 +349,7 @@ namespace ut
 				char metadata[256];
 				char fileAndNumber[125]{};
 
-				if (_options.IncludeFileAndLine) {
+				if (Options.IncludeFileAndLine) {
 					sprintf(fileAndNumber, " %s:%03d", FileName, LineNumber);
 				}
 
@@ -496,13 +496,13 @@ namespace ut
 
 	public:
 		static LoggerOptions GlobalLoggerOptions;
+		LoggerOptions Options;
 
 	private:
 		void _internal_log(LogLevel logLevel, const std::string& input);
 		uint64_t _get_current_thread_id();
 
 	private:
-		LoggerOptions _options;
 		std::fstream _file_stream;
 		static std::chrono::steady_clock::time_point _start_timestamp;
 	};
@@ -936,18 +936,18 @@ namespace ut
 	}
 
 	Logger::Logger(LoggerOptions options) :
-		_options(options)
+		Options(options)
 	{
-		if (_options.LoggerType & LOGGER_TYPE_FILE) {
-			if (_options.LoggerOutputFileName.length() == 0)
-				_options.LoggerOutputFileName = (std::to_string(time(NULL)) + ".log.txt");
-			_file_stream.open(_options.LoggerOutputFileName, std::ios::out);
+		if (Options.LoggerType & LOGGER_TYPE_FILE) {
+			if (Options.LoggerOutputFileName.length() == 0)
+				Options.LoggerOutputFileName = (std::to_string(time(NULL)) + ".log.txt");
+			_file_stream.open(Options.LoggerOutputFileName, std::ios::out);
 		}
 	}
 
 	Logger::Logger(Logger&& move) noexcept
 	{
-		_options = move._options;
+		Options = move.Options;
 		_file_stream = std::move(move._file_stream);
 	}
 
@@ -965,7 +965,7 @@ namespace ut
 	void Logger::_internal_log(LogLevel logLevel, const std::string& output)
 	{
 		std::lock_guard<std::mutex> lock(_console_lock);
-		if (_options.LoggerType & LOGGER_TYPE_CONSOLE) {
+		if (Options.LoggerType & LOGGER_TYPE_CONSOLE) {
 #ifdef _WIN32
 			static HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
 			switch (logLevel) {
@@ -999,7 +999,7 @@ namespace ut
 			std::cout << output << "\033[0m";
 #endif
 					}
-		if (_options.LoggerType & LOGGER_TYPE_FILE) {
+		if (Options.LoggerType & LOGGER_TYPE_FILE) {
 			_file_stream << output;
 			_file_stream.flush();
 		}
@@ -1008,7 +1008,7 @@ namespace ut
 	void Logger::AddFileLogging(const char* FileName)
 	{
 		_file_stream = std::fstream(FileName, std::ios::out);
-		_options.LoggerType |= LOGGER_TYPE_FILE;
+		Options.LoggerType |= LOGGER_TYPE_FILE;
 	}
 
 	uint64_t Logger::_get_current_thread_id()
