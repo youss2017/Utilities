@@ -170,49 +170,49 @@ namespace ut
 	void ShowWarningBox(std::string_view title, std::string_view text);
 	void ShowErrorBox(std::string_view title, std::string_view text);
 
-	// std::string contains find (indexOf) rfind(lastIndexOf) substring
+	// std::string contains find (IndexOf) rfind(LastIndexOf) substring
 	// for more info lookup std::string::find() and std::string::rfind()
 
-	std::string replace(std::string_view source, std::string_view find, std::string_view replace);
-	std::string replaceAll(std::string_view source, std::string_view find, std::string_view replace);
-	std::wstring replace(std::wstring_view source, std::wstring_view find, std::wstring_view replace);
-	std::wstring replaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view replace);
+	std::string Replace(std::string_view source, std::string_view find, std::string_view Replace);
+	std::string ReplaceAll(std::string_view source, std::string_view find, std::string_view Replace);
+	std::wstring Replace(std::wstring_view source, std::wstring_view find, std::wstring_view Replace);
+	std::wstring ReplaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view Replace);
 
-	inline size_t lastIndexOf(std::string_view source, std::string_view find) { return source.rfind(find.data()); }
-	inline size_t indexOf(std::string_view source, std::string_view find) { return source.find(find.data()); }
+	inline size_t LastIndexOf(std::string_view source, std::string_view find) { return source.rfind(find.data()); }
+	inline size_t IndexOf(std::string_view source, std::string_view find) { return source.find(find.data()); }
 
-	inline size_t lastIndexOf(std::wstring_view source, std::wstring_view find) { return source.rfind(find.data()); }
-	inline size_t indexOf(std::wstring_view source, std::wstring_view find) { return source.find(find.data()); }
+	inline size_t LastIndexOf(std::wstring_view source, std::wstring_view find) { return source.rfind(find.data()); }
+	inline size_t IndexOf(std::wstring_view source, std::wstring_view find) { return source.find(find.data()); }
 
-	std::vector<std::string> split(const std::string& source, std::string_view regex);
-	std::vector<std::wstring> split(const std::wstring& source, std::wstring_view regex);
+	std::vector<std::string> Split(const std::string& source, std::string_view regex);
+	std::vector<std::wstring> Split(const std::wstring& source, std::wstring_view regex);
 
-	std::string lower(std::string_view source);
-	std::string upper(std::string_view source);
+	std::string LowerCase(std::string_view source);
+	std::string UpperCase(std::string_view source);
 
-	std::wstring lower(std::wstring_view source);
-	std::wstring upper(std::wstring_view source);
+	std::wstring LowerCase(std::wstring_view source);
+	std::wstring UpperCase(std::wstring_view source);
 
 	std::wstring ToWideString(std::string_view source);
 	std::string ToAsciiString(std::wstring_view source);
 
-	std::string ltrim(std::string_view source);
-	std::string rtrim(std::string_view source);
-	std::string trim(std::string_view source);
+	std::string LTrim(std::string_view source);
+	std::string RTrim(std::string_view source);
+	std::string Trim(std::string_view source);
 
-	std::wstring ltrim(std::wstring_view source);
-	std::wstring rtrim(std::wstring_view source);
-	std::wstring trim(std::wstring_view source);
+	std::wstring LTrim(std::wstring_view source);
+	std::wstring RTrim(std::wstring_view source);
+	std::wstring Trim(std::wstring_view source);
 
 	bool EqualIgnoreCase(std::string_view a, std::string_view b);
 	bool StartsWith(std::string_view source, std::string_view find);
 	bool EndsWith(std::string_view source, std::string_view find);
-	bool contains(std::string_view source, std::string_view find);
+	bool Contains(std::string_view source, std::string_view find);
 
 	bool EqualIgnoreCase(std::wstring_view a, std::wstring_view b);
 	bool StartsWith(std::wstring_view source, std::wstring_view find);
 	bool EndsWith(std::wstring_view source, std::wstring_view find);
-	bool contains(std::wstring_view source, std::wstring_view find);
+	bool Contains(std::wstring_view source, std::wstring_view find);
 
 	size_t ToInt64(std::string_view source);
 	bool TryToInt64(std::string_view source, size_t& RefInt64);
@@ -461,17 +461,17 @@ namespace ut
 #ifdef CPP_UTILITY_IMPLEMENTATION
 	static std::mutex _console_lock;
 
-	std::string replace(std::string_view source, std::string_view find, std::string_view replace)
+	std::string Replace(std::string_view source, std::string_view find, std::string_view Replace)
 	{
 		std::string result = source.data();
 		size_t start_pos = source.find(find);
 		if (start_pos == std::string::npos)
 			return result;
-		result.replace(start_pos, replace.length(), replace);
+		result.replace(start_pos, Replace.length(), Replace);
 		return result;
 	}
 
-	std::string replaceAll(std::string_view source, std::string_view find, std::string_view replace)
+	std::string ReplaceAll(std::string_view source, std::string_view find, std::string_view Replace)
 	{
 		std::string result = source.data();
 		if (find.empty())
@@ -479,23 +479,23 @@ namespace ut
 		size_t start_pos = 0;
 		while ((start_pos = result.find(find, start_pos)) != std::string::npos)
 		{
-			result.replace(start_pos, find.length(), replace);
-			start_pos += replace.length();
+			result.replace(start_pos, find.length(), Replace);
+			start_pos += Replace.length();
 		}
 		return result;
 	}
 
-	std::wstring replace(std::wstring_view source, std::wstring_view find, std::wstring_view replace)
+	std::wstring Replace(std::wstring_view source, std::wstring_view find, std::wstring_view Replace)
 	{
 		std::wstring result = source.data();
 		size_t start_pos = source.find(find);
 		if (start_pos == std::string::npos)
 			return result;
-		result.replace(start_pos, find.length(), replace);
+		result.replace(start_pos, find.length(), Replace);
 		return result;
 	}
 
-	std::wstring replaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view replace)
+	std::wstring ReplaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view Replace)
 	{
 		std::wstring result = source.data();
 		if (find.empty())
@@ -503,31 +503,31 @@ namespace ut
 		size_t start_pos = 0;
 		while ((start_pos = result.find(find, start_pos)) != std::string::npos)
 		{
-			result.replace(start_pos, result.length(), replace);
-			start_pos += replace.length();
+			result.replace(start_pos, result.length(), Replace);
+			start_pos += Replace.length();
 		}
 		return result;
 	}
 
-	std::vector<std::string> split(const std::string& source, std::string_view regex)
+	std::vector<std::string> Split(const std::string& source, std::string_view regex)
 	{
-		std::vector<std::string> split_content;
+		std::vector<std::string> Split_content;
 		std::regex pattern(regex.data());
 		std::copy(std::sregex_token_iterator(source.begin(), source.end(), pattern, -1),
-			std::sregex_token_iterator(), back_inserter(split_content));
-		return split_content;
+			std::sregex_token_iterator(), back_inserter(Split_content));
+		return Split_content;
 	}
 
-	std::vector<std::wstring> split(const std::wstring& source, std::wstring_view regex)
+	std::vector<std::wstring> Split(const std::wstring& source, std::wstring_view regex)
 	{
-		std::vector<std::wstring> split_content;
+		std::vector<std::wstring> Split_content;
 		std::wregex pattern(regex.data());
 		std::copy(std::wsregex_token_iterator(source.begin(), source.end(), pattern, -1),
-			std::wsregex_token_iterator(), back_inserter(split_content));
-		return split_content;
+			std::wsregex_token_iterator(), back_inserter(Split_content));
+		return Split_content;
 	}
 
-	std::string lower(std::string_view source)
+	std::string LowerCase(std::string_view source)
 	{
 		std::string lw = source.data();
 		for (int i = 0; i < lw.size(); i++)
@@ -535,7 +535,7 @@ namespace ut
 		return lw;
 	}
 
-	std::string upper(std::string_view source)
+	std::string UpperCase(std::string_view source)
 	{
 		std::string up = source.data();
 		for (int i = 0; i < up.length(); i++)
@@ -543,7 +543,7 @@ namespace ut
 		return up;
 	}
 
-	std::wstring lower(std::wstring_view source)
+	std::wstring LowerCase(std::wstring_view source)
 	{
 		std::wstring lw = source.data();
 		for (int i = 0; i < lw.size(); i++)
@@ -551,7 +551,7 @@ namespace ut
 		return lw;
 	}
 
-	std::wstring upper(std::wstring_view source)
+	std::wstring UpperCase(std::wstring_view source)
 	{
 		std::wstring up = source.data();
 		for (int i = 0; i < up.length(); i++)
@@ -575,7 +575,7 @@ namespace ut
 		return result;
 	}
 
-	std::string ltrim(std::string_view source)
+	std::string LTrim(std::string_view source)
 	{
 		std::string s = source.data();
 		s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch)
@@ -583,7 +583,7 @@ namespace ut
 		return s;
 	}
 
-	std::string rtrim(std::string_view source)
+	std::string RTrim(std::string_view source)
 	{
 		std::string s = source.data();
 		s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
@@ -593,12 +593,12 @@ namespace ut
 		return s;
 	}
 
-	std::string trim(std::string_view source)
+	std::string Trim(std::string_view source)
 	{
-		return rtrim(ltrim(source));
+		return RTrim(LTrim(source));
 	}
 
-	std::wstring ltrim(std::wstring_view source)
+	std::wstring LTrim(std::wstring_view source)
 	{
 		std::wstring s = source.data();
 		s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](wchar_t ch)
@@ -606,7 +606,7 @@ namespace ut
 		return s;
 	}
 
-	std::wstring rtrim(std::wstring_view source)
+	std::wstring RTrim(std::wstring_view source)
 	{
 		std::wstring s = source.data();
 		s.erase(std::find_if(s.rbegin(), s.rend(), [](wchar_t ch)
@@ -616,14 +616,14 @@ namespace ut
 		return s;
 	}
 
-	std::wstring trim(std::wstring_view source)
+	std::wstring Trim(std::wstring_view source)
 	{
-		return rtrim(ltrim(source));
+		return RTrim(LTrim(source));
 	}
 
 	bool EqualIgnoreCase(std::string_view a, std::string_view b)
 	{
-		return lower(a) == lower(b);
+		return LowerCase(a) == LowerCase(b);
 	}
 
 	bool StartsWith(std::string_view source, std::string_view find)
@@ -636,14 +636,14 @@ namespace ut
 		return source.rfind(find) != std::string_view::npos;
 	}
 
-	bool contains(std::string_view source, std::string_view find)
+	bool Contains(std::string_view source, std::string_view find)
 	{
 		return source.find(find) != std::string_view::npos;
 	}
 
 	bool EqualIgnoreCase(std::wstring_view a, std::wstring_view b)
 	{
-		return lower(a) == lower(b);
+		return LowerCase(a) == LowerCase(b);
 	}
 
 	bool StartsWith(std::wstring_view source, std::wstring_view find)
@@ -656,7 +656,7 @@ namespace ut
 		return source.rfind(find);
 	}
 
-	bool contains(std::wstring_view source, std::wstring_view find)
+	bool Contains(std::wstring_view source, std::wstring_view find)
 	{
 		return source.find(find) != std::string_view::npos;
 	}
