@@ -1,5 +1,4 @@
 #pragma once
-#define _CRT_SECURE_NO_WARNINGS
 #include <string>
 #include <vector>
 #include <string_view>
@@ -171,49 +170,49 @@ namespace ut
 	void ShowWarningBox(std::string_view title, std::string_view text);
 	void ShowErrorBox(std::string_view title, std::string_view text);
 
-	// std::string contains find (indexOf) rfind(lastIndexOf) substring
+	// std::string contains find (IndexOf) rfind(LastIndexOf) substring
 	// for more info lookup std::string::find() and std::string::rfind()
 
-	std::string replace(std::string_view source, std::string_view find, std::string_view replace);
-	std::string replaceAll(std::string_view source, std::string_view find, std::string_view replace);
-	std::wstring replace(std::wstring_view source, std::wstring_view find, std::wstring_view replace);
-	std::wstring replaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view replace);
+	std::string Replace(std::string_view source, std::string_view find, std::string_view Replace);
+	std::string ReplaceAll(std::string_view source, std::string_view find, std::string_view Replace);
+	std::wstring Replace(std::wstring_view source, std::wstring_view find, std::wstring_view Replace);
+	std::wstring ReplaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view Replace);
 
-	inline size_t lastIndexOf(std::string_view source, std::string_view find) { return source.rfind(find.data()); }
-	inline size_t indexOf(std::string_view source, std::string_view find) { return source.find(find.data()); }
+	inline size_t LastIndexOf(std::string_view source, std::string_view find) { return source.rfind(find.data()); }
+	inline size_t IndexOf(std::string_view source, std::string_view find) { return source.find(find.data()); }
 
-	inline size_t lastIndexOf(std::wstring_view source, std::wstring_view find) { return source.rfind(find.data()); }
-	inline size_t indexOf(std::wstring_view source, std::wstring_view find) { return source.find(find.data()); }
+	inline size_t LastIndexOf(std::wstring_view source, std::wstring_view find) { return source.rfind(find.data()); }
+	inline size_t IndexOf(std::wstring_view source, std::wstring_view find) { return source.find(find.data()); }
 
-	std::vector<std::string> split(const std::string& source, std::string_view regex);
-	std::vector<std::wstring> split(const std::wstring& source, std::wstring_view regex);
+	std::vector<std::string> Split(const std::string& source, std::string_view regex);
+	std::vector<std::wstring> Split(const std::wstring& source, std::wstring_view regex);
 
-	std::string lower(std::string_view source);
-	std::string upper(std::string_view source);
+	std::string LowerCase(std::string_view source);
+	std::string UpperCase(std::string_view source);
 
-	std::wstring lower(std::wstring_view source);
-	std::wstring upper(std::wstring_view source);
+	std::wstring LowerCase(std::wstring_view source);
+	std::wstring UpperCase(std::wstring_view source);
 
 	std::wstring ToWideString(std::string_view source);
 	std::string ToAsciiString(std::wstring_view source);
 
-	std::string ltrim(std::string_view source);
-	std::string rtrim(std::string_view source);
-	std::string trim(std::string_view source);
+	std::string LTrim(std::string_view source);
+	std::string RTrim(std::string_view source);
+	std::string Trim(std::string_view source);
 
-	std::wstring ltrim(std::wstring_view source);
-	std::wstring rtrim(std::wstring_view source);
-	std::wstring trim(std::wstring_view source);
+	std::wstring LTrim(std::wstring_view source);
+	std::wstring RTrim(std::wstring_view source);
+	std::wstring Trim(std::wstring_view source);
 
 	bool EqualIgnoreCase(std::string_view a, std::string_view b);
 	bool StartsWith(std::string_view source, std::string_view find);
 	bool EndsWith(std::string_view source, std::string_view find);
-	bool contains(std::string_view source, std::string_view find);
+	bool Contains(std::string_view source, std::string_view find);
 
 	bool EqualIgnoreCase(std::wstring_view a, std::wstring_view b);
 	bool StartsWith(std::wstring_view source, std::wstring_view find);
 	bool EndsWith(std::wstring_view source, std::wstring_view find);
-	bool contains(std::wstring_view source, std::wstring_view find);
+	bool Contains(std::wstring_view source, std::wstring_view find);
 
 	size_t ToInt64(std::string_view source);
 	bool TryToInt64(std::string_view source, size_t& RefInt64);
@@ -406,7 +405,7 @@ namespace ut
 			char currentTime[80]{};
 			{
 				time_t rawTime = time(NULL);
-				if (_options.IncludeDate) {
+				if (Options.IncludeDate) {
 					strftime(currentTime, 80, "%Y/%m/%d %H:%M:%S %p", localtime(&rawTime));
 				}
 				else {
@@ -421,11 +420,11 @@ namespace ut
 				FileName = FileName ? FileName : ".";
 				char metadata[256];
 				char fileAndNumber[125]{};
-				
-				if (_options.IncludeFileAndLine) {
+
+				if (Options.IncludeFileAndLine) {
 					sprintf(fileAndNumber, " %s:%03d", FileName, LineNumber);
 				}
-				
+
 				switch (logLevel) {
 				case LogLevel::INFO:
 				case LogLevel::INFOBOLD:
@@ -450,7 +449,10 @@ namespace ut
 			}
 			bool openbracket = false;
 			bool closebracket = false;
+			bool formatSpecifier = false;
 			int argumentId = 0;
+			char argumentFormatSpecifier[30]{};
+			int formatSpecifierIndex = 0;
 			for (int i = 0; i < input.size(); i++) {
 				if (input[i] == '{') {
 					openbracket = !openbracket;
@@ -460,6 +462,16 @@ namespace ut
 				if (input[i] == '}' && !openbracket) {
 					closebracket = !closebracket;
 					if (!closebracket) result += "}";
+					continue;
+				}
+				if (input[i] == ':' && openbracket) {
+					formatSpecifier = true;
+					formatSpecifierIndex = 0;
+					memset(argumentFormatSpecifier, 0, sizeof(argumentFormatSpecifier));
+					continue;
+				}
+				if (formatSpecifier && openbracket && input[i] != '}') {
+					argumentFormatSpecifier[formatSpecifierIndex++] = input[i];
 					continue;
 				}
 				if (openbracket) {
@@ -482,22 +494,58 @@ namespace ut
 					case '9': argumentId = argumentId * 10 + 9; break;
 					case '}': {
 						auto& e = vec[argumentId];
-						switch (e.get_type()) {
-						case any::Int8: result += std::to_string(e.get_int8()); break;
-						case any::Int16: result += std::to_string(e.get_int16()); break;
-						case any::Int32: result += std::to_string(e.get_int32()); break;
-						case any::Int64: result += std::to_string(e.get_int64()); break;
-						case any::UInt8: result += std::to_string(e.get_uint8()); break;
-						case any::UInt16: result += std::to_string(e.get_uint16()); break;
-						case any::UInt32: result += std::to_string(e.get_uint32()); break;
-						case any::UInt64: result += std::to_string(e.get_uint64()); break;
-						case any::Float: result += std::to_string(e.get_float()); break;
-						case any::Double: result += std::to_string(e.get_double()); break;
-						case any::String: result += e.get_string(); break;
-						case any::Ptr: result += std::to_string((uint64_t)e.get_ptr()); break;
+						std::string argument_output;
+
+#define set_argument_output(type) \
+						{\
+							if (formatSpecifier) {\
+								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, type);\
+								argument_output.resize(nbytes);\
+								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, type);\
+							}\
+							else\
+								argument_output = std::to_string(type);\
+							break;\
 						}
+
+						switch (e.get_type()) {
+						case any::Int8: set_argument_output(e.get_int8());
+						case any::Int16: set_argument_output(e.get_int16());
+						case any::Int32: set_argument_output(e.get_int32());
+						case any::Int64: set_argument_output(e.get_int64());
+
+						case any::UInt8: set_argument_output(e.get_uint8());
+						case any::UInt16: set_argument_output(e.get_uint16());
+						case any::UInt32: set_argument_output(e.get_uint32());
+						case any::UInt64: set_argument_output(e.get_uint64());
+
+						case any::Float: set_argument_output(e.get_float());
+						case any::Double: set_argument_output(e.get_double());
+						case any::String: {
+							if (formatSpecifier) {
+								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_string());
+								argument_output.resize(nbytes);
+								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_string());
+							}
+							else
+								argument_output = e.get_string();
+							break;
+						}
+						case any::Ptr: {
+							if (!formatSpecifier) {
+								strcat(argumentFormatSpecifier, "%p");
+							}
+							size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_float());
+							argument_output.resize(nbytes);
+							snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_float());
+							break;
+						}
+						}
+						result += argument_output;
 						openbracket = false;
 						argumentId = 0;
+						formatSpecifier = false;
+#undef set_argument_output
 						break;
 					}
 					default: openbracket = false;
@@ -523,13 +571,13 @@ namespace ut
 
 	public:
 		static LoggerOptions GlobalLoggerOptions;
+		LoggerOptions Options;
 
 	private:
 		void _internal_log(LogLevel logLevel, const std::string& input);
 		uint64_t _get_current_thread_id();
 
 	private:
-		LoggerOptions _options;
 		std::fstream _file_stream;
 		static std::chrono::steady_clock::time_point _start_timestamp;
 	};
@@ -537,17 +585,17 @@ namespace ut
 #ifdef CPP_UTILITY_IMPLEMENTATION
 	static std::mutex _console_lock;
 
-	std::string replace(std::string_view source, std::string_view find, std::string_view replace)
+	std::string Replace(std::string_view source, std::string_view find, std::string_view Replace)
 	{
 		std::string result = source.data();
 		size_t start_pos = source.find(find);
 		if (start_pos == std::string::npos)
 			return result;
-		result.replace(start_pos, replace.length(), replace);
+		result.replace(start_pos, Replace.length(), Replace);
 		return result;
 	}
 
-	std::string replaceAll(std::string_view source, std::string_view find, std::string_view replace)
+	std::string ReplaceAll(std::string_view source, std::string_view find, std::string_view Replace)
 	{
 		std::string result = source.data();
 		if (find.empty())
@@ -555,23 +603,23 @@ namespace ut
 		size_t start_pos = 0;
 		while ((start_pos = result.find(find, start_pos)) != std::string::npos)
 		{
-			result.replace(start_pos, find.length(), replace);
-			start_pos += replace.length();
+			result.replace(start_pos, find.length(), Replace);
+			start_pos += Replace.length();
 		}
 		return result;
 	}
 
-	std::wstring replace(std::wstring_view source, std::wstring_view find, std::wstring_view replace)
+	std::wstring Replace(std::wstring_view source, std::wstring_view find, std::wstring_view Replace)
 	{
 		std::wstring result = source.data();
 		size_t start_pos = source.find(find);
 		if (start_pos == std::string::npos)
 			return result;
-		result.replace(start_pos, find.length(), replace);
+		result.replace(start_pos, find.length(), Replace);
 		return result;
 	}
 
-	std::wstring replaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view replace)
+	std::wstring ReplaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view Replace)
 	{
 		std::wstring result = source.data();
 		if (find.empty())
@@ -579,31 +627,31 @@ namespace ut
 		size_t start_pos = 0;
 		while ((start_pos = result.find(find, start_pos)) != std::string::npos)
 		{
-			result.replace(start_pos, result.length(), replace);
-			start_pos += replace.length();
+			result.replace(start_pos, result.length(), Replace);
+			start_pos += Replace.length();
 		}
 		return result;
 	}
 
-	std::vector<std::string> split(const std::string& source, std::string_view regex)
+	std::vector<std::string> Split(const std::string& source, std::string_view regex)
 	{
-		std::vector<std::string> split_content;
+		std::vector<std::string> Split_content;
 		std::regex pattern(regex.data());
 		std::copy(std::sregex_token_iterator(source.begin(), source.end(), pattern, -1),
-			std::sregex_token_iterator(), back_inserter(split_content));
-		return split_content;
+			std::sregex_token_iterator(), back_inserter(Split_content));
+		return Split_content;
 	}
 
-	std::vector<std::wstring> split(const std::wstring& source, std::wstring_view regex)
+	std::vector<std::wstring> Split(const std::wstring& source, std::wstring_view regex)
 	{
-		std::vector<std::wstring> split_content;
+		std::vector<std::wstring> Split_content;
 		std::wregex pattern(regex.data());
 		std::copy(std::wsregex_token_iterator(source.begin(), source.end(), pattern, -1),
-			std::wsregex_token_iterator(), back_inserter(split_content));
-		return split_content;
+			std::wsregex_token_iterator(), back_inserter(Split_content));
+		return Split_content;
 	}
 
-	std::string lower(std::string_view source)
+	std::string LowerCase(std::string_view source)
 	{
 		std::string lw = source.data();
 		for (int i = 0; i < lw.size(); i++)
@@ -611,7 +659,7 @@ namespace ut
 		return lw;
 	}
 
-	std::string upper(std::string_view source)
+	std::string UpperCase(std::string_view source)
 	{
 		std::string up = source.data();
 		for (int i = 0; i < up.length(); i++)
@@ -619,7 +667,7 @@ namespace ut
 		return up;
 	}
 
-	std::wstring lower(std::wstring_view source)
+	std::wstring LowerCase(std::wstring_view source)
 	{
 		std::wstring lw = source.data();
 		for (int i = 0; i < lw.size(); i++)
@@ -627,7 +675,7 @@ namespace ut
 		return lw;
 	}
 
-	std::wstring upper(std::wstring_view source)
+	std::wstring UpperCase(std::wstring_view source)
 	{
 		std::wstring up = source.data();
 		for (int i = 0; i < up.length(); i++)
@@ -651,7 +699,7 @@ namespace ut
 		return result;
 	}
 
-	std::string ltrim(std::string_view source)
+	std::string LTrim(std::string_view source)
 	{
 		std::string s = source.data();
 		s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch)
@@ -659,7 +707,7 @@ namespace ut
 		return s;
 	}
 
-	std::string rtrim(std::string_view source)
+	std::string RTrim(std::string_view source)
 	{
 		std::string s = source.data();
 		s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
@@ -669,12 +717,12 @@ namespace ut
 		return s;
 	}
 
-	std::string trim(std::string_view source)
+	std::string Trim(std::string_view source)
 	{
-		return rtrim(ltrim(source));
+		return RTrim(LTrim(source));
 	}
 
-	std::wstring ltrim(std::wstring_view source)
+	std::wstring LTrim(std::wstring_view source)
 	{
 		std::wstring s = source.data();
 		s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](wchar_t ch)
@@ -682,7 +730,7 @@ namespace ut
 		return s;
 	}
 
-	std::wstring rtrim(std::wstring_view source)
+	std::wstring RTrim(std::wstring_view source)
 	{
 		std::wstring s = source.data();
 		s.erase(std::find_if(s.rbegin(), s.rend(), [](wchar_t ch)
@@ -692,14 +740,14 @@ namespace ut
 		return s;
 	}
 
-	std::wstring trim(std::wstring_view source)
+	std::wstring Trim(std::wstring_view source)
 	{
-		return rtrim(ltrim(source));
+		return RTrim(LTrim(source));
 	}
 
 	bool EqualIgnoreCase(std::string_view a, std::string_view b)
 	{
-		return lower(a) == lower(b);
+		return LowerCase(a) == LowerCase(b);
 	}
 
 	bool StartsWith(std::string_view source, std::string_view find)
@@ -712,14 +760,14 @@ namespace ut
 		return source.rfind(find) != std::string_view::npos;
 	}
 
-	bool contains(std::string_view source, std::string_view find)
+	bool Contains(std::string_view source, std::string_view find)
 	{
 		return source.find(find) != std::string_view::npos;
 	}
 
 	bool EqualIgnoreCase(std::wstring_view a, std::wstring_view b)
 	{
-		return lower(a) == lower(b);
+		return LowerCase(a) == LowerCase(b);
 	}
 
 	bool StartsWith(std::wstring_view source, std::wstring_view find)
@@ -732,7 +780,7 @@ namespace ut
 		return source.rfind(find);
 	}
 
-	bool contains(std::wstring_view source, std::wstring_view find)
+	bool Contains(std::wstring_view source, std::wstring_view find)
 	{
 		return source.find(find) != std::string_view::npos;
 	}
@@ -945,7 +993,7 @@ namespace ut
 #else
 		raise(SIGTRAP);
 #endif
-}
+	}
 
 	void ShowInfoBox(std::string_view title, std::string_view text)
 	{
@@ -963,18 +1011,18 @@ namespace ut
 	}
 
 	Logger::Logger(LoggerOptions options) :
-		_options(options)
+		Options(options)
 	{
-		if (_options.LoggerType & LOGGER_TYPE_FILE) {
-			if (_options.LoggerOutputFileName.length() == 0)
-				_options.LoggerOutputFileName = (std::to_string(time(NULL)) + ".log.txt");
-			_file_stream.open(_options.LoggerOutputFileName, std::ios::out);
+		if (Options.LoggerType & LOGGER_TYPE_FILE) {
+			if (Options.LoggerOutputFileName.length() == 0)
+				Options.LoggerOutputFileName = (std::to_string(time(NULL)) + ".log.txt");
+			_file_stream.open(Options.LoggerOutputFileName, std::ios::out);
 		}
 	}
 
 	Logger::Logger(Logger&& move) noexcept
 	{
-		_options = move._options;
+		Options = move.Options;
 		_file_stream = std::move(move._file_stream);
 	}
 
@@ -992,7 +1040,7 @@ namespace ut
 	void Logger::_internal_log(LogLevel logLevel, const std::string& output)
 	{
 		std::lock_guard<std::mutex> lock(_console_lock);
-		if (_options.LoggerType & LOGGER_TYPE_CONSOLE) {
+		if (Options.LoggerType & LOGGER_TYPE_CONSOLE) {
 #ifdef _WIN32
 			static HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
 			switch (logLevel) {
@@ -1017,7 +1065,7 @@ namespace ut
 			case LogLevel::ERR:
 				std::cout << "\x1B[31m";
 				break;
-			}
+					}
 #endif
 #ifdef _WIN32
 			std::cout << output;
@@ -1025,17 +1073,17 @@ namespace ut
 #else
 			std::cout << output << "\033[0m";
 #endif
-		}
-		if (_options.LoggerType & LOGGER_TYPE_FILE) {
+					}
+		if (Options.LoggerType & LOGGER_TYPE_FILE) {
 			_file_stream << output;
 			_file_stream.flush();
 		}
-	}
+				}
 
 	void Logger::AddFileLogging(const char* FileName)
 	{
 		_file_stream = std::fstream(FileName, std::ios::out);
-		_options.LoggerType |= LOGGER_TYPE_FILE;
+		Options.LoggerType |= LOGGER_TYPE_FILE;
 	}
 
 	uint64_t Logger::_get_current_thread_id()
@@ -1052,4 +1100,4 @@ namespace ut
 
 #endif
 
-}
+			}

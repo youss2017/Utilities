@@ -214,6 +214,17 @@ namespace sw {
 		/// <returns>Check the IsConnected flag to determine if this is a valid connection.</returns>
 		Socket Accept();
 
+		/// <summary>
+		/// Joins multicast group
+		/// The multicast addresses are in the range 224.0.0.0 through 239.255.255.255.
+		/// From iana.org
+		/// This function must be called after Bind(...).
+		/// This function tells the kernel to listen packets from this group and send them
+		/// to your application.
+		/// NOTE: Throws exception on failure.
+		/// </summary>
+		Socket& JoinMulticastGroup(const std::string& GroupAddress);
+
 		const Endpoint& GetEndpoint();
 
 		// Proper Disconnection.
@@ -241,10 +252,24 @@ namespace sw {
 		/// <returns>Socket Validatity</returns>
 		bool IsValid();
 
-		Socket& EnableBroadcast();
+		Socket& SetBroadcastOption(bool value);
 
 		// Allows other applications to use this interface(ex loopback, any, etc...) and port combination.
-		Socket& EnableReuseAddr();
+		// Must be called before Bind() or will not be effective.
+		Socket& SetReuseAddrOption(bool value);
+
+		// True means your application recv your multicast packets
+		Socket& SetMulticastLoopOption(bool value);
+
+		/// <summary>
+		/// Timeout is in milliseconds
+		/// </summary>
+		/// <param name="Connections"></param>
+		void WaitForData(int32_t timeout);
+		static void WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout);
+		static void WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, int32_t timeout);
+		static void WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout);
+		static std::vector<NetworkAdapter> EnumerateNetworkAdapters();
 
 		/// <summary>
 		/// Timeout is in milliseconds
@@ -700,9 +725,9 @@ namespace sw {
 		return inet_ntoa(((sockaddr_in*)result->ai_addr)->sin_addr);
 	}
 
-	Socket& Socket::EnableBroadcast()
+	Socket& Socket::SetBroadcastOption(bool value)
 	{
-		int enabled = 1;
+		int enabled = value ? 1 : 0;
 		setsockopt(mSocket, SOL_SOCKET, SO_BROADCAST, (const char*)&enabled, sizeof(enabled));
 		return *this;
 	}
@@ -777,12 +802,37 @@ namespace sw {
 		return result;
 	}
 
-	Socket& Socket::EnableReuseAddr()
+	Socket& Socket::SetReuseAddrOption(bool value)
 	{
-		const int enable = 1;
+		int enable = value ? 1 : 0;
 		if (setsockopt(mSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int)) < 0) {
 			throw std::runtime_error("Could not enable Reuse Addr.");
 		}
+		return *this;
+	}
+
+	Socket& Socket::JoinMulticastGroup(const std::string& GroupAddress)
+	{
+		struct ip_mreq mreq;
+		mreq.imr_multiaddr.s_addr = ::inet_addr(GroupAddress.c_str());
+		mreq.imr_interface.s_addr = ::inet_addr("192.168.1.76");
+		if (setsockopt(mSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
+			throw std::runtime_error("Failed to join multicast group.");
+		}
+//		in_addr localInterface{};
+//		localInterface.s_addr = inet_addr(GroupAddress.c_str());
+//		if (setsockopt(mSocket, IPPROTO_IP, IP_MULTICAST_IF, (char*)&localInterface, sizeof(localInterface)) < 0)
+//
+//		{
+//			throw std::runtime_error("Failed to join multicast group. (2)");
+//}
+		return *this;
+	}
+
+	Socket& Socket::SetMulticastLoopOption(bool value)
+	{
+		int enable = value ? 1 : 0;
+		setsockopt(mSocket, IPPROTO_IP, IP_MULTICAST_LOOP, (char*)&enable, sizeof(int));
 		return *this;
 	}
 
