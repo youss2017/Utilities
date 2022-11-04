@@ -27,6 +27,9 @@ void simple_multicast_listener() {
 }
 
 int main() {
+	ut::Logger::GetGlobalLogger().Options.ShowMessageBoxOnError = true;
+	ut::Logger::GetGlobalLogger().Options.DebugBreakOnError = true;
+
 	LOG(INFO, "Hello My Name is {0}, {1} and I'm {{{2}}}.", "Youssef", "Samwel", 18);
 
 	// Logger testing
@@ -66,6 +69,8 @@ int main() {
 	LOG(INFO, "POINTER {0}", (void*)_sample);
 
 	LOG(WARNING, "{0:%.2f}  {1:%09.3f}", 3.145677, 4917.24);
+
+	LOG(ERR, "Catastropic I/O Error on PCI-e bus.");
 
 	std::this_thread::sleep_for(std::chrono::days(10));
 

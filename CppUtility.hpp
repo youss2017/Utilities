@@ -13,6 +13,8 @@
 // #define CPP_UTILITY_IMPLEMENTATION in one of your cpp files (only one)
 // #define LOGGER_DISABLE_LOGGING to disable logging
 
+// #define CPP_UTILITY_IMPLEMENTATION
+
 #ifdef _WIN32
 #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 #else
@@ -1023,7 +1025,15 @@ namespace ut
 			_file_stream << output;
 			_file_stream.flush();
 		}
-				}
+		if (logLevel == LogLevel::ERR) {
+			if (Options.ShowMessageBoxOnError) {
+				ut::ShowErrorBox("Encountered an Error", output);
+			}
+			if (Options.DebugBreakOnError) {
+				ut::DebugBreak();
+			}
+		}
+		}
 
 	void Logger::AddFileLogging(const char* FileName)
 	{
