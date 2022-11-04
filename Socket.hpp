@@ -2,11 +2,14 @@
 
 // Code style inspired by Nothings STB
 // Define SOCKET_API_IMPLEMENTATION in one of your CPP files
+// #define SOCKET_API_IMPLEMENTATION
 
 #include <string>
 #include <cstdint>
 #include <vector>
 #include <ostream>
+#include <memory>
+#include <sstream>
 #ifdef SOCKET_API_IMPLEMENTATION
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -37,6 +40,52 @@ typedef int socklen_t;
 #endif
 
 namespace sw {
+
+	enum NetworkAdapterTypeFlags : uint32_t {
+		NETWORK_ADAPTER_LOOPBACK = 0b0001,
+		NETWORK_ADAPTER_ETHERNET = 0b0010,
+		NETWORK_ADAPTER_IEEE801Wireless = 0b0100,
+		NETWORK_ADAPTER_OtherOrUnknown = 0b1000
+	};
+
+	struct NetworkAdapter {
+		uint32_t TypeFlags = 0;
+		std::string Name;
+		std::string Description;
+		// If adapter interface is "0.0.0.0" then the adapter is offline
+		std::vector<std::string> IPv4Address;
+		std::vector<std::string> SubnetAddress;
+		std::vector<std::string> BroadcastAddress;
+		std::string GatewayAddress;
+
+		operator std::string() {
+			std::stringstream ss;
+			auto flagSet = [](uint32_t test, uint32_t input) {
+				return (input & test) ? "true" : "false";
+			};
+			auto ipToArrayString = [](const std::vector<std::string>& source) {
+				std::stringstream ss;
+				ss << "[";
+				for (size_t i = 0; i < source.size(); i++) {
+					ss << '"' << source[i] << '"';
+					if (i != source.size() - 1)
+						ss << ", ";
+				}
+				ss << "]";
+				return ss.str();
+			};
+			ss << "\"Name\": \"" << Name << "\",\n\"Description\": \"" << Description << "\",\n\"Data\": { \n\t\"IPv4\": " << ipToArrayString(IPv4Address)
+				<< ",\n\t\"Subnet\": " << ipToArrayString(SubnetAddress)
+				<< ",\n\t\"Broadcast\": " << ipToArrayString(BroadcastAddress)
+				<< ",\n\t\"Gateway\": \"" << GatewayAddress << "\"\n}\n"
+				<< "\"Type\": {\n\t\"Loopback\": " << flagSet(NETWORK_ADAPTER_LOOPBACK, TypeFlags)
+				<< ",\n\t\"Ethernet\": " << flagSet(NETWORK_ADAPTER_ETHERNET, TypeFlags)
+				<< ",\n\t\"IEEE801Wireless\": " << flagSet(NETWORK_ADAPTER_IEEE801Wireless, TypeFlags)
+				<< ",\n\t\"OtherOrUnknown\": " << flagSet(NETWORK_ADAPTER_OtherOrUnknown, TypeFlags)
+				<< "\n}";
+			return ss.str();
+		}
+	};
 
 	// Calls WSAStartup on windows
 	bool Startup();
@@ -93,10 +142,16 @@ namespace sw {
 			return { address, port };
 		}
 
-		static Endpoint GetEndPointBroadcast(uint16_t port);
+		constexpr std::string ToString() const {
+			return mAddress + ":" + std::to_string(mPort);
+		}
+
+		constexpr operator std::string() const {
+			return ToString();
+		}
 
 		friend std::ostream& operator<<(std::ostream& stream, const Endpoint& endpoint) {
-			stream << endpoint.mAddress << ":" << endpoint.mPort;
+			stream << endpoint.ToString();
 			return stream;
 		}
 	};
@@ -107,7 +162,9 @@ namespace sw {
 	public:
 		Socket() = default;
 		Socket(uint64_t RawSocketHandle, SocketType type, const Endpoint& Endpoint, bool IsConnected) :
-			mSocket(RawSocketHandle), mType(type), mEndpoint(Endpoint), mIsConnected(IsConnected) {}
+			mSocket(RawSocketHandle), mType(type), mEndpoint(Endpoint), mIsConnected(IsConnected) {
+			if (IsConnected) mConnectedTimestamp = time(NULL);
+		}
 		Socket(SocketType type);
 		Socket(Socket& copy) = delete;
 		Socket(Socket&&) noexcept;
@@ -186,14 +243,31 @@ namespace sw {
 
 		Socket& EnableBroadcast();
 
-		void WaitForData();
-		static void WaitForData(const std::vector<sw::Socket>& Connections);
+		// Allows other applications to use this interface(ex loopback, any, etc...) and port combination.
+		Socket& EnableReuseAddr();
+
+		/// <summary>
+		/// Timeout is in milliseconds
+		/// </summary>
+		/// <param name="Connections"></param>
+		void WaitForData(int32_t timeout);
+		static void WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout);
+		static void WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, int32_t timeout);
+		static void WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout);
+		static std::vector<NetworkAdapter> EnumerateNetworkAdapters();
 
 		inline bool IsBlocking() {
 			return mIsBlocking;
 		}
 
-		bool IsConnected();
+		constexpr bool IsConnected() const
+		{
+			return mIsConnected;
+		}
+
+		constexpr uint64_t SockFd() const { return mSocket; }
+		// time(NULL) when connection was established
+		constexpr uint64_t ConnectedTimestamp() const { return mConnectedTimestamp; }
 
 	private:
 		bool mIsConnected = false;
@@ -202,6 +276,7 @@ namespace sw {
 		Endpoint mEndpoint = { "0.0.0.0", 0 };
 		bool mIsBlocking = true;
 		bool mKeepAlive = false;
+		uint64_t mConnectedTimestamp = 0;
 	};
 
 #ifdef SOCKET_API_IMPLEMENTATION
@@ -332,105 +407,6 @@ namespace sw {
 #endif
 	}
 
-	static ::in_addr GetIPAddress(bool adapaterAddressFlag, bool subnetAddressFlag, bool broadcastAddressFlag, int* pOutSubnetBits = nullptr)
-	{
-		static ::in_addr adapterAddress;
-		static ::in_addr subnetAddress;
-		static ::in_addr broadcastAddress;
-		static int subnetBits;
-		static bool initalize = true;
-		if (initalize)
-		{
-			initalize = false;
-#ifdef _WIN32
-			ULONG size = 0;
-			GetAdaptersInfo(nullptr, &size);
-			PIP_ADAPTER_INFO ip = (PIP_ADAPTER_INFO)malloc(size);
-			void* allocationAddress = ip;
-			GetAdaptersInfo(ip, &size);
-			while (true)
-			{
-				if (ip->Type & (IF_TYPE_IEEE80211 | MIB_IF_TYPE_ETHERNET))
-					if (strcmp(ip->IpAddressList.IpAddress.String, "0.0.0.0") != 0 &&
-						strcmp(ip->GatewayList.IpAddress.String, "0.0.0.0") != 0 &&
-						strcmp(ip->DhcpServer.IpAddress.String, "0.0.0.0") != 0)
-					{
-						break;
-					}
-				ip = ip->Next;
-				if (!ip)
-					break;
-			}
-			if (ip != NULL)
-			{
-				uint32_t adapterAddressInt = inet_addr(ip->IpAddressList.IpAddress.String);
-				uint32_t subnetAddressInt = inet_addr(ip->IpAddressList.IpMask.String);
-				subnetBits =
-					(((subnetAddressInt >> 24) == 0x00) ? 8 : 0) +
-					(((subnetAddressInt >> 16) == 0x00) ? 8 : 0) +
-					(((subnetAddressInt >> 8) == 0x00) ? 8 : 0) +
-					(((subnetAddressInt >> 0) == 0x00) ? 8 : 0);
-				unsigned char broadcastAddressInt[4];
-				broadcastAddressInt[3] = subnetBits >= 8 ? 255 : (adapterAddressInt >> 24) & 0xff;
-				broadcastAddressInt[2] = subnetBits >= 16 ? 255 : (adapterAddressInt >> 16) & 0xff;
-				broadcastAddressInt[1] = subnetBits >= 24 ? 255 : (adapterAddressInt >> 8) & 0xff;
-				broadcastAddressInt[0] = subnetBits >= 32 ? 255 : (adapterAddressInt >> 0) & 0xff;
-				memcpy(&adapterAddress, &adapterAddressInt, sizeof(uint32_t));
-				memcpy(&subnetAddress, &subnetAddressInt, sizeof(uint32_t));
-				memcpy(&broadcastAddress, &broadcastAddressInt, sizeof(uint32_t));
-			}
-			free(allocationAddress);
-#else
-			// from https://stackoverflow.com/questions/18100761/obtaining-subnetmask-in-c
-			::ifaddrs* ifap;
-			::getifaddrs(&ifap);
-			for (::ifaddrs* ifa = ifap; ifa; ifa = ifa->ifa_next)
-			{
-				if (ifa->ifa_addr->sa_family == AF_INET)
-				{
-					std::string address = inet_ntoa(((sockaddr_in*)ifa->ifa_addr)->sin_addr);
-					std::string netmask = inet_ntoa(((sockaddr_in*)ifa->ifa_netmask)->sin_addr);
-					if (strcmp(address.c_str(), "127.0.0.1") != 0 && strcmp(address.c_str(), "0.0.0.0") != 0)
-					{
-						uint32_t adapterAddressInt = ((::sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr;
-						uint32_t subnetAddressInt = ((::sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr;
-						subnetBits =
-							(((subnetAddressInt >> 24) == 0x00) ? 8 : 0) +
-							(((subnetAddressInt >> 16) == 0x00) ? 8 : 0) +
-							(((subnetAddressInt >> 8) == 0x00) ? 8 : 0) +
-							(((subnetAddressInt >> 0) == 0x00) ? 8 : 0);
-						unsigned char broadcastAddressInt[4];
-						broadcastAddressInt[3] = subnetBits >= 8 ? 255 : (adapterAddressInt >> 24) & 0xff;
-						broadcastAddressInt[2] = subnetBits >= 16 ? 255 : (adapterAddressInt >> 16) & 0xff;
-						broadcastAddressInt[1] = subnetBits >= 24 ? 255 : (adapterAddressInt >> 8) & 0xff;
-						broadcastAddressInt[0] = subnetBits >= 32 ? 255 : (adapterAddressInt >> 0) & 0xff;
-						memcpy(&adapterAddress, &adapterAddressInt, sizeof(uint32_t));
-						memcpy(&subnetAddress, &subnetAddressInt, sizeof(uint32_t));
-						memcpy(&broadcastAddress, &broadcastAddressInt, sizeof(uint32_t));
-						break;
-					}
-				}
-			}
-			::freeifaddrs(ifap);
-#endif
-		}
-		if (pOutSubnetBits)
-			*pOutSubnetBits = subnetBits;
-		if (adapaterAddressFlag)
-		{
-			return adapterAddress;
-		}
-		if (subnetAddressFlag)
-		{
-			return subnetAddress;
-		}
-		if (broadcastAddressFlag)
-		{
-			return broadcastAddress;
-		}
-		return adapterAddress;
-	}
-
 	// Throws Exception on failure
 	Socket& Socket::Bind(SocketInterface interfaceType, uint16_t port, const char* customInterface)
 	{
@@ -477,9 +453,14 @@ namespace sw {
 		addr.sin_addr.s_addr = inet_addr(address.c_str());
 		addr.sin_port = htons(port);
 		addr.sin_family = AF_INET;
-		if (::connect(mSocket, (sockaddr*)&addr, sizeof(addr)) < 0)
+		if (::connect(mSocket, (sockaddr*)&addr, sizeof(addr)) == 0)
 		{
-			mIsConnected = GetSocketConnectionStateFromError();
+			mIsConnected = true;
+			mConnectedTimestamp = time(NULL);
+		}
+		else {
+			mIsConnected = 0;
+			mConnectedTimestamp = 0;
 		}
 		return *this;
 	}
@@ -619,6 +600,7 @@ namespace sw {
 #else
 		::shutdown(mSocket, SHUT_RDWR);
 #endif
+		mIsConnected = false;
 		return *this;
 	}
 
@@ -642,15 +624,15 @@ namespace sw {
 		return mSocket > 0;
 	}
 
-	void Socket::WaitForData()
+	void Socket::WaitForData(int32_t timeout)
 	{
 		WSAPOLLFD fdArray{};
 		fdArray.fd = mSocket;
 		fdArray.events = POLLRDNORM;
-		::WSAPoll(&fdArray, 1, INFINITE);
+		::WSAPoll(&fdArray, 1, timeout);
 	}
 
-	void Socket::WaitForData(const std::vector<sw::Socket>& Connections)
+	void Socket::WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout)
 	{
 		if (Connections.size() == 0)
 			return;
@@ -662,17 +644,49 @@ namespace sw {
 			fdArray[i].fd = Connections[i].mSocket;
 			fdArray[i].events = POLLRDNORM;
 		}
-		::WSAPoll(fdArray, (ULONG)Connections.size(), INFINITE);
+		::WSAPoll(fdArray, (uint32_t)Connections.size(), timeout);
 #else
 #error "Not supported"
 #endif
 		_freea(fdArray);
 	}
 
-	bool Socket::IsConnected()
+	void Socket::WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, int32_t timeout)
 	{
-		assert(mType == SocketType::TCP);
-		return mIsConnected;
+		if (Connections.size() == 0)
+			return;
+#ifdef _WIN32
+		WSAPOLLFD* fdArray = (WSAPOLLFD*)_malloca(sizeof(WSAPOLLFD) * Connections.size());
+		if (!fdArray)
+			return;
+		for (int i = 0; i < Connections.size(); i++) {
+			fdArray[i].fd = Connections[i]->SockFd();
+			fdArray[i].events = POLLRDNORM;
+		}
+		::WSAPoll(fdArray, (ULONG)Connections.size(), timeout);
+#else
+#error "Not supported"
+#endif
+		_freea(fdArray);
+	}
+
+	void Socket::WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout)
+	{
+		if (Connections.size() == 0)
+			return;
+#ifdef _WIN32
+		WSAPOLLFD* fdArray = (WSAPOLLFD*)_malloca(sizeof(WSAPOLLFD) * Connections.size());
+		if (!fdArray)
+			return;
+		for (int i = 0; i < Connections.size(); i++) {
+			fdArray[i].fd = Connections[i]->SockFd();
+			fdArray[i].events = POLLRDNORM;
+		}
+		::WSAPoll(fdArray, (ULONG)Connections.size(), timeout);
+#else
+#error "Not supported"
+#endif
+		_freea(fdArray);
 	}
 
 	std::string Endpoint::GetDomainAddress(const std::string& domain, const char* ServicesName)
@@ -686,20 +700,92 @@ namespace sw {
 		return inet_ntoa(((sockaddr_in*)result->ai_addr)->sin_addr);
 	}
 
-	Endpoint Endpoint::GetEndPointBroadcast(uint16_t port)
-	{
-		Endpoint ep;
-		ep.mAddress = inet_ntoa(GetIPAddress(false, false, true));
-		ep.mPort = port;
-		return ep;
-	}
-
 	Socket& Socket::EnableBroadcast()
 	{
 		int enabled = 1;
 		setsockopt(mSocket, SOL_SOCKET, SO_BROADCAST, (const char*)&enabled, sizeof(enabled));
 		return *this;
 	}
+
+	std::vector<NetworkAdapter> Socket::EnumerateNetworkAdapters()
+	{
+		std::vector<NetworkAdapter> result;
+#ifdef _WIN32
+		ULONG adapterInfoSize = 0;
+		GetAdaptersInfo(nullptr, &adapterInfoSize);
+		IP_ADAPTER_INFO* adapterInfo = (IP_ADAPTER_INFO*)new char[adapterInfoSize];
+		GetAdaptersInfo(adapterInfo, &adapterInfoSize);
+		while (adapterInfo->Next) {
+			NetworkAdapter na;
+			na.Name = adapterInfo->AdapterName;
+			na.Description = adapterInfo->Description;
+			PIP_ADDR_STRING ipAddrs = &adapterInfo->IpAddressList;
+			while (ipAddrs) {
+				std::string ip = ipAddrs->IpAddress.String;
+				std::string mask = ipAddrs->IpMask.String;
+
+				auto extractIpFromString = [](const std::string ip, uint8_t output[4]) {
+					size_t ip_d0 = ip.find(".", 0);
+					size_t ip_d1 = ip.find(".", ip_d0 + 1);
+					size_t ip_d2 = ip.find(".", ip_d1 + 1);
+
+					output[0] = uint8_t(std::stoul(ip.substr(0, ip_d0)));
+					output[1] = uint8_t(std::stoul(ip.substr(ip_d0 + 1, ip_d1 - ip_d0 - 1)));
+					output[2] = uint8_t(std::stoul(ip.substr(ip_d1 + 1, ip_d2 - ip_d1 - 1)));
+					output[3] = uint8_t(std::stoul(ip.substr(ip_d2 + 1)));
+				};
+				uint8_t ip8[4];
+				uint8_t mask8[4];
+				extractIpFromString(mask, mask8);
+				extractIpFromString(ip, ip8);
+				std::string broadcastIp;
+				for (int i = 0; i < 4; i++) {
+					mask8[i] = mask8[i] ^ 0xFF;
+					broadcastIp += std::to_string(ip8[i] | mask8[i]);
+					if (i != 3)
+						broadcastIp += ".";
+				}
+				na.IPv4Address.push_back(std::move(ip));
+				na.SubnetAddress.push_back(std::move(mask));
+				na.BroadcastAddress.push_back(broadcastIp);
+				ipAddrs = ipAddrs->Next;
+			}
+			na.GatewayAddress = adapterInfo->GatewayList.IpAddress.String;
+			auto type = adapterInfo->Type;
+			if (type & MIB_IF_TYPE_ETHERNET) {
+				na.TypeFlags = na.TypeFlags | NETWORK_ADAPTER_ETHERNET;
+			}
+			if (type & MIB_IF_TYPE_LOOPBACK) {
+				na.TypeFlags = na.TypeFlags | NETWORK_ADAPTER_LOOPBACK;
+			}
+			if (type & IF_TYPE_IEEE80211) {
+				na.TypeFlags = na.TypeFlags | NETWORK_ADAPTER_IEEE801Wireless;
+			}
+			if ((type & MIB_IF_TYPE_OTHER) ||
+				(type & IF_TYPE_ISO88025_TOKENRING) ||
+				(type & MIB_IF_TYPE_PPP) ||
+				(type & MIB_IF_TYPE_SLIP)) {
+				na.TypeFlags = na.TypeFlags | NETWORK_ADAPTER_OtherOrUnknown;
+			}
+			result.push_back(na);
+			adapterInfo = adapterInfo->Next;
+		}
+		// delete[] adapterInfo;
+#else
+#error "Not Implemented"
+#endif
+		return result;
+	}
+
+	Socket& Socket::EnableReuseAddr()
+	{
+		const int enable = 1;
+		if (setsockopt(mSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int)) < 0) {
+			throw std::runtime_error("Could not enable Reuse Addr.");
+		}
+		return *this;
+	}
+
 
 #endif
 

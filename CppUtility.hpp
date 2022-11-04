@@ -297,6 +297,76 @@ namespace ut
 		} m_data;
 	};
 
+	template<typename ... Arg>
+	std::string Format(const std::string& input, Arg... arguments)
+	{
+		using namespace std;
+		std::vector<any> vec{ arguments... };
+		std::string result;
+		result.reserve((size_t)(input.size() * 1.5));
+		
+		bool openbracket = false;
+		bool closebracket = false;
+		int argumentId = 0;
+		for (int i = 0; i < input.size(); i++) {
+			if (input[i] == '{') {
+				openbracket = !openbracket;
+				if (!openbracket) result += "{";
+				continue;
+			}
+			if (input[i] == '}' && !openbracket) {
+				closebracket = !closebracket;
+				if (!closebracket) result += "}";
+				continue;
+			}
+			if (openbracket) {
+				if (argumentId >= vec.size()) {
+					result += "{OUT_OF_RANGE:" + std::to_string(argumentId) + "}";
+					openbracket = false;
+					argumentId = 0;
+					continue;
+				}
+				switch (input[i]) {
+				case '0': argumentId = argumentId * 10 + 0; break;
+				case '1': argumentId = argumentId * 10 + 1; break;
+				case '2': argumentId = argumentId * 10 + 2; break;
+				case '3': argumentId = argumentId * 10 + 3; break;
+				case '4': argumentId = argumentId * 10 + 4; break;
+				case '5': argumentId = argumentId * 10 + 5; break;
+				case '6': argumentId = argumentId * 10 + 6; break;
+				case '7': argumentId = argumentId * 10 + 7; break;
+				case '8': argumentId = argumentId * 10 + 8; break;
+				case '9': argumentId = argumentId * 10 + 9; break;
+				case '}': {
+					auto& e = vec[argumentId];
+					switch (e.get_type()) {
+					case any::Int8: result += std::to_string(e.get_int8()); break;
+					case any::Int16: result += std::to_string(e.get_int16()); break;
+					case any::Int32: result += std::to_string(e.get_int32()); break;
+					case any::Int64: result += std::to_string(e.get_int64()); break;
+					case any::UInt8: result += std::to_string(e.get_uint8()); break;
+					case any::UInt16: result += std::to_string(e.get_uint16()); break;
+					case any::UInt32: result += std::to_string(e.get_uint32()); break;
+					case any::UInt64: result += std::to_string(e.get_uint64()); break;
+					case any::Float: result += std::to_string(e.get_float()); break;
+					case any::Double: result += std::to_string(e.get_double()); break;
+					case any::String: result += e.get_string(); break;
+					case any::Ptr: result += std::to_string((uint64_t)e.get_ptr()); break;
+					}
+					openbracket = false;
+					argumentId = 0;
+					break;
+				}
+				default: openbracket = false;
+				}
+			}
+			else {
+				result += input[i];
+			}
+		}
+		return result;
+	}
+
 	enum LoggerFlags : int32_t {
 		LOGGER_TYPE_CONSOLE = 0b01,
 		LOGGER_TYPE_FILE = 0b10
@@ -314,6 +384,8 @@ namespace ut
 		bool IncludeDate = false;
 		bool IncludeFileAndLine = true;
 		std::string LoggerOutputFileName;
+		bool ShowMessageBoxOnError = false;
+		bool DebugBreakOnError = false;
 	};
 
 	class Logger {
@@ -335,10 +407,10 @@ namespace ut
 			{
 				time_t rawTime = time(NULL);
 				if (_options.IncludeDate) {
-					strftime(currentTime, 80, "[%Y/%m/%d %H:%M:%S %p", localtime(&rawTime));
+					strftime(currentTime, 80, "%Y/%m/%d %H:%M:%S %p", localtime(&rawTime));
 				}
 				else {
-					strftime(currentTime, 80, "[%H:%M:%S %p", localtime(&rawTime));
+					strftime(currentTime, 80, "%H:%M:%S %p", localtime(&rawTime));
 				}
 			}
 			std::string result = currentTime;
@@ -357,20 +429,23 @@ namespace ut
 				switch (logLevel) {
 				case LogLevel::INFO:
 				case LogLevel::INFOBOLD:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "INFO");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "INFO");
 					break;
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "INFO");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "INFO");
 					break;
 				case LogLevel::WARNING:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "WARNING");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "WARNING");
 					break;
 				case LogLevel::ERR:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "ERROR");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "ERROR");
 					break;
 				default:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s] ", timeSinceStart, fileAndNumber, threadId, "UNKNOWN");
+					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "UNKNOWN");
 					break;
 				}
+				std::string fmtInput = Format(input, arguments...);
+				std::string alt = Format("{0} ({1:%.2fs}) | {2} {3} {4:%-7s} {5}", currentTime, timeSinceStart, fileAndNumber, threadId, "INFO",
+					fmtInput);
 				result += metadata;
 			}
 			bool openbracket = false;
