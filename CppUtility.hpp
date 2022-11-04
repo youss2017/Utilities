@@ -303,24 +303,37 @@ namespace ut
 		std::vector<any> vec{ arguments... };
 		std::string result;
 		result.reserve((size_t)(input.size() * 1.5));
-		
+
 		bool openbracket = false;
 		bool closebracket = false;
+		bool formatSpecifier = false;
 		int argumentId = 0;
+		char argumentFormatSpecifier[30]{};
+		int formatSpecifierIndex = 0;
 		for (int i = 0; i < input.size(); i++) {
 			if (input[i] == '{') {
 				openbracket = !openbracket;
-				if (!openbracket) result += "{";
+				if (!openbracket) result.append("{");
 				continue;
 			}
 			if (input[i] == '}' && !openbracket) {
 				closebracket = !closebracket;
-				if (!closebracket) result += "}";
+				if (!closebracket) result.append("}");
+				continue;
+			}
+			if (input[i] == ':' && openbracket) {
+				formatSpecifier = true;
+				formatSpecifierIndex = 0;
+				memset(argumentFormatSpecifier, 0, sizeof(argumentFormatSpecifier));
+				continue;
+			}
+			if (formatSpecifier && openbracket && input[i] != '}') {
+				argumentFormatSpecifier[formatSpecifierIndex++] = input[i];
 				continue;
 			}
 			if (openbracket) {
 				if (argumentId >= vec.size()) {
-					result += "{OUT_OF_RANGE:" + std::to_string(argumentId) + "}";
+					result.append("{OUT_OF_RANGE:" + std::to_string(argumentId) + "}");
 					openbracket = false;
 					argumentId = 0;
 					continue;
@@ -338,22 +351,61 @@ namespace ut
 				case '9': argumentId = argumentId * 10 + 9; break;
 				case '}': {
 					auto& e = vec[argumentId];
+					std::string argument_output;
+
+#define set_argument_output(type) \
+						{\
+							if (formatSpecifier) {\
+								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, type);\
+								argument_output.resize(nbytes);\
+								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, type);\
+								argument_output.pop_back();\
+							}\
+							else\
+								argument_output = std::to_string(type);\
+							break;\
+						}
+
 					switch (e.get_type()) {
-					case any::Int8: result += std::to_string(e.get_int8()); break;
-					case any::Int16: result += std::to_string(e.get_int16()); break;
-					case any::Int32: result += std::to_string(e.get_int32()); break;
-					case any::Int64: result += std::to_string(e.get_int64()); break;
-					case any::UInt8: result += std::to_string(e.get_uint8()); break;
-					case any::UInt16: result += std::to_string(e.get_uint16()); break;
-					case any::UInt32: result += std::to_string(e.get_uint32()); break;
-					case any::UInt64: result += std::to_string(e.get_uint64()); break;
-					case any::Float: result += std::to_string(e.get_float()); break;
-					case any::Double: result += std::to_string(e.get_double()); break;
-					case any::String: result += e.get_string(); break;
-					case any::Ptr: result += std::to_string((uint64_t)e.get_ptr()); break;
+					case any::Int8: set_argument_output(e.get_int8());
+					case any::Int16: set_argument_output(e.get_int16());
+					case any::Int32: set_argument_output(e.get_int32());
+					case any::Int64: set_argument_output(e.get_int64());
+
+					case any::UInt8: set_argument_output(e.get_uint8());
+					case any::UInt16: set_argument_output(e.get_uint16());
+					case any::UInt32: set_argument_output(e.get_uint32());
+					case any::UInt64: set_argument_output(e.get_uint64());
+
+					case any::Float: set_argument_output(e.get_float());
+					case any::Double: set_argument_output(e.get_double());
+					case any::String: {
+						if (formatSpecifier) {
+							size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_string());
+							argument_output.resize(nbytes);
+							snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_string());
+							argument_output.pop_back();
+						}
+						else
+							argument_output = e.get_string();
+						break;
 					}
+					case any::Ptr: {
+						if (!formatSpecifier) {
+							strcat(argumentFormatSpecifier, "%p");
+						}
+						size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_float());
+						argument_output.resize(nbytes);
+						snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_float());
+						argument_output.pop_back();
+						break;
+					}
+					}
+					result.append(argument_output);
 					openbracket = false;
 					argumentId = 0;
+					formatSpecifier = false;
+#undef set_argument_output
 					break;
 				}
 				default: openbracket = false;
@@ -412,148 +464,41 @@ namespace ut
 					strftime(currentTime, 80, "%H:%M:%S %p", localtime(&rawTime));
 				}
 			}
-			std::string result = currentTime;
 			double timeSinceStart = double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - _start_timestamp).count()) * 1e-9;
-			result.reserve((size_t)(input.size() * 1.5));
 			uint64_t threadId = _get_current_thread_id();
+			std::string result;
 			{
 				FileName = FileName ? FileName : ".";
-				char metadata[256];
 				char fileAndNumber[125]{};
 
 				if (Options.IncludeFileAndLine) {
 					sprintf(fileAndNumber, " %s:%03d", FileName, LineNumber);
 				}
 
+				const char* INFOLabel = "INFO";
+				const char* WARNINGLabel = "WARNING";
+				const char* ERRORLabel = "ERROR";
+				const char* UNKNOWNLabel = "UNKNOWN";
+				const char* pLogLevel = nullptr;
+
 				switch (logLevel) {
 				case LogLevel::INFO:
 				case LogLevel::INFOBOLD:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "INFO");
-					break;
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "INFO");
+					pLogLevel = INFOLabel;
 					break;
 				case LogLevel::WARNING:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "WARNING");
+					pLogLevel = WARNINGLabel;
 					break;
 				case LogLevel::ERR:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "ERROR");
+					pLogLevel = ERRORLabel;
 					break;
 				default:
-					sprintf(metadata, " (%.2fs) |%s (%llu) %-7s ", timeSinceStart, fileAndNumber, threadId, "UNKNOWN");
+					pLogLevel = UNKNOWNLabel;
 					break;
 				}
-				std::string fmtInput = Format(input, arguments...);
-				std::string alt = Format("{0} ({1:%.2fs}) | {2} {3} {4:%-7s} {5}", currentTime, timeSinceStart, fileAndNumber, threadId, "INFO",
-					fmtInput);
-				result += metadata;
-			}
-			bool openbracket = false;
-			bool closebracket = false;
-			bool formatSpecifier = false;
-			int argumentId = 0;
-			char argumentFormatSpecifier[30]{};
-			int formatSpecifierIndex = 0;
-			for (int i = 0; i < input.size(); i++) {
-				if (input[i] == '{') {
-					openbracket = !openbracket;
-					if (!openbracket) result += "{";
-					continue;
-				}
-				if (input[i] == '}' && !openbracket) {
-					closebracket = !closebracket;
-					if (!closebracket) result += "}";
-					continue;
-				}
-				if (input[i] == ':' && openbracket) {
-					formatSpecifier = true;
-					formatSpecifierIndex = 0;
-					memset(argumentFormatSpecifier, 0, sizeof(argumentFormatSpecifier));
-					continue;
-				}
-				if (formatSpecifier && openbracket && input[i] != '}') {
-					argumentFormatSpecifier[formatSpecifierIndex++] = input[i];
-					continue;
-				}
-				if (openbracket) {
-					if (argumentId >= vec.size()) {
-						result += "{OUT_OF_RANGE:" + std::to_string(argumentId) + "}";
-						openbracket = false;
-						argumentId = 0;
-						continue;
-					}
-					switch (input[i]) {
-					case '0': argumentId = argumentId * 10 + 0; break;
-					case '1': argumentId = argumentId * 10 + 1; break;
-					case '2': argumentId = argumentId * 10 + 2; break;
-					case '3': argumentId = argumentId * 10 + 3; break;
-					case '4': argumentId = argumentId * 10 + 4; break;
-					case '5': argumentId = argumentId * 10 + 5; break;
-					case '6': argumentId = argumentId * 10 + 6; break;
-					case '7': argumentId = argumentId * 10 + 7; break;
-					case '8': argumentId = argumentId * 10 + 8; break;
-					case '9': argumentId = argumentId * 10 + 9; break;
-					case '}': {
-						auto& e = vec[argumentId];
-						std::string argument_output;
-
-#define set_argument_output(type) \
-						{\
-							if (formatSpecifier) {\
-								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, type);\
-								argument_output.resize(nbytes);\
-								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, type);\
-							}\
-							else\
-								argument_output = std::to_string(type);\
-							break;\
-						}
-
-						switch (e.get_type()) {
-						case any::Int8: set_argument_output(e.get_int8());
-						case any::Int16: set_argument_output(e.get_int16());
-						case any::Int32: set_argument_output(e.get_int32());
-						case any::Int64: set_argument_output(e.get_int64());
-
-						case any::UInt8: set_argument_output(e.get_uint8());
-						case any::UInt16: set_argument_output(e.get_uint16());
-						case any::UInt32: set_argument_output(e.get_uint32());
-						case any::UInt64: set_argument_output(e.get_uint64());
-
-						case any::Float: set_argument_output(e.get_float());
-						case any::Double: set_argument_output(e.get_double());
-						case any::String: {
-							if (formatSpecifier) {
-								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_string());
-								argument_output.resize(nbytes);
-								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_string());
-							}
-							else
-								argument_output = e.get_string();
-							break;
-						}
-						case any::Ptr: {
-							if (!formatSpecifier) {
-								strcat(argumentFormatSpecifier, "%p");
-							}
-							size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_float());
-							argument_output.resize(nbytes);
-							snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_float());
-							break;
-						}
-						}
-						result += argument_output;
-						openbracket = false;
-						argumentId = 0;
-						formatSpecifier = false;
-#undef set_argument_output
-						break;
-					}
-					default: openbracket = false;
-					}
-				}
-				else {
-					result += input[i];
-				}
+				auto x = Format(input, arguments...);
+				result = Format("{0} ({1:%.2fs}) | {2} {3} {4:%-8s} {5}", currentTime, timeSinceStart, fileAndNumber, threadId, pLogLevel,
+					x);
 			}
 			result += "\n";
 			_internal_log(logLevel, result);

@@ -11,7 +11,8 @@
 void simple_multicast_sender() {
 	sw::Startup();
 	sw::Socket s(sw::SocketType::UDP);
-	s.Bind(sw::SocketInterface::Any, 4000).EnableBroadcast();
+	s.Bind(sw::SocketInterface::Any, 4000).SetBroadcastOption(true);
+}
 
 void simple_multicast_listener() {
 	sw::Startup();
@@ -26,7 +27,6 @@ void simple_multicast_listener() {
 }
 
 int main() {
-	std::cout << ut::Format("Hello My Name is {0}, {1} and I'm {{{2}}}.", "Youssef", "Samwel", 18);
 	LOG(INFO, "Hello My Name is {0}, {1} and I'm {{{2}}}.", "Youssef", "Samwel", 18);
 
 	// Logger testing

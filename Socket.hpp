@@ -271,16 +271,6 @@ namespace sw {
 		static void WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout);
 		static std::vector<NetworkAdapter> EnumerateNetworkAdapters();
 
-		/// <summary>
-		/// Timeout is in milliseconds
-		/// </summary>
-		/// <param name="Connections"></param>
-		void WaitForData(int32_t timeout);
-		static void WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout);
-		static void WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, int32_t timeout);
-		static void WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout);
-		static std::vector<NetworkAdapter> EnumerateNetworkAdapters();
-
 		inline bool IsBlocking() {
 			return mIsBlocking;
 		}
