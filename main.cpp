@@ -27,6 +27,9 @@ void simple_multicast_listener() {
 }
 
 int main() {
+
+	auto data = ut::ReadAllText("main.cpp");
+
 	ut::Logger::GetGlobalLogger().Options.ShowMessageBoxOnError = true;
 	ut::Logger::GetGlobalLogger().Options.DebugBreakOnError = true;
 

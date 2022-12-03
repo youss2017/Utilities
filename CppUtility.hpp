@@ -228,20 +228,20 @@ namespace ut
 	double ToDouble(std::wstring_view source);
 	bool TryToDouble(std::wstring_view source, double& RefDouble);
 
-	bool WriteBinaryFile(std::string_view path, const void* data, size_t size);
-	bool WriteTextFile(std::string_view path, const char* text, size_t size);
+	bool WriteAllBytes(std::string_view path, const void* data, size_t size);
+	bool WriteAllText(std::string_view path, std::string_view text, size_t size);
 
 	/// <summary>
 	/// Reads file binary into vector. First element in vector determines success status.
 	/// </summary>
 	/// <returns>First element in vector determines success status. 1 == success, 0 == fail</returns>
-	std::vector<uint8_t> ReadBinaryFile(std::string_view path);
+	std::optional<std::vector<uint8_t>> ReadAllBytes(std::string_view path);
 
 	/// <summary>
 	/// Reads file binary into vector. First element in vector determines success status.
 	/// </summary>
 	/// <returns>First element in vector determines success status. 1 == success, 0 == fail</returns>
-	std::vector<char> ReadTextFile(std::string_view path);
+	std::optional<std::string> ReadAllText(std::string_view path);
 
 	bool Exists(std::string_view path);
 	std::string ReadLine(FILE* file);
@@ -804,10 +804,9 @@ namespace ut
 		}
 	}
 
-	std::vector<char> ReadTextFile(std::string_view path)
+	std::optional<std::string> ReadAllText(std::string_view path)
 	{
-		std::vector<char> text;
-		text.push_back(0);
+		std::string text;
 		try
 		{
 			std::filesystem::path location(path);
@@ -816,32 +815,28 @@ namespace ut
 				FILE* input = fopen(path.data(), "r");
 				if (!input)
 				{
-					text.push_back('\0');
-					return text;
+					return {};
 				}
 				fseek(input, 0, SEEK_END);
 				size_t size = ftell(input);
 				if (size == 0)
 				{
-					text[0] = 1;
-					text.push_back('\0');
 					fclose(input);
-					return text;
+					return "";
 				}
 				fseek(input, 0, SEEK_SET);
 				text.resize(size + 1);
-				size = fread(&text[1], 1, size, input);
+				size = fread(&text[0], 1, size, input);
 				fclose(input);
 				text.resize(size + 1);
 				text.shrink_to_fit();
-				text[0] = 1;
 			}
 		}
 		catch (std::exception)
 		{
-			text.push_back('\0');
-			return text;
+			return {};
 		}
+		if (text.size() == 0) return {};
 		text.push_back('\0');
 		return text;
 	}
@@ -875,10 +870,9 @@ namespace ut
 		return true;
 	}
 
-	std::vector<uint8_t> ReadBinaryFile(std::string_view path)
+	std::optional<std::vector<uint8_t>> ReadAllBytes(std::string_view path)
 	{
 		std::vector<uint8_t> binary;
-		binary.push_back(0);
 		try
 		{
 			std::filesystem::path location(path);
@@ -893,27 +887,26 @@ namespace ut
 				size_t size = ftell(input);
 				if (size == 0)
 				{
-					binary[0] = 1;
 					fclose(input);
-					return binary;
+					return {std::vector<uint8_t>()};
 				}
 				fseek(input, 0, SEEK_SET);
 				binary.resize(size + 1);
-				size = fread(&binary[1], 1, size, input);
+				size = fread(&binary[0], 1, size, input);
 				fclose(input);
 				binary.resize(size + 1);
 				binary.shrink_to_fit();
-				binary[0] = 1;
 			}
 		}
-		catch (std::exception)
+		catch (...)
 		{
-			return binary;
+			return {};
 		}
+		if (binary.size() == 0) return {};
 		return binary;
 	}
 
-	bool WriteBinaryFile(std::string_view path, const void* data, size_t size)
+	bool WriteAllBytes(std::string_view path, const void* data, size_t size)
 	{
 		FILE* output = fopen(path.data(), "wb");
 		if (!output)
@@ -923,12 +916,12 @@ namespace ut
 		return true;
 	}
 
-	bool WriteTextFile(std::string_view path, const char* text, size_t size)
+	bool WriteAllText(std::string_view path, std::string_view text, size_t size)
 	{
 		FILE* output = fopen(path.data(), "w");
 		if (!output)
 			return false;
-		fwrite(text, 1, size, output);
+		fwrite(text.data(), 1, size, output);
 		fclose(output);
 		return true;
 	}
