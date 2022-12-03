@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstring>
 #include <chrono>
+#include <stdexcept>
 
 // #define CPP_UTILITY_IMPLEMENTATION in one of your cpp files (only one)
 // #define LOGGER_DISABLE_LOGGING to disable logging
@@ -25,8 +26,9 @@
 #define LOG(logLevel, x, ...) ut::Logger::GetGlobalLogger().print(ut::LogLevel::logLevel, __FILENAME__, __LINE__,  x, __VA_ARGS__)
 #else
 #define LOG(logLevel, x, ...)
-#define LOGLN(logLevel, x, ...)
 #endif
+
+#define LOGEXCEPT(x, ...) { auto err = ut::Format(x, __VA_ARGS__); LOG(ERR, err); throw std::runtime_error(err); }
 
 #ifdef CPP_UTILITY_IMPLEMENTATION
 #ifdef _WIN32
