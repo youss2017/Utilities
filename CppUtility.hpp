@@ -231,7 +231,7 @@ namespace ut
 	bool TryToDouble(std::wstring_view source, double& RefDouble);
 
 	bool WriteAllBytes(std::string_view path, const void* data, size_t size);
-	bool WriteAllText(std::string_view path, std::string_view text, size_t size);
+	bool WriteAllText(std::string_view path, std::string_view text);
 
 	/// <summary>
 	/// Reads file binary into vector. First element in vector determines success status.
@@ -918,12 +918,12 @@ namespace ut
 		return true;
 	}
 
-	bool WriteAllText(std::string_view path, std::string_view text, size_t size)
+	bool WriteAllText(std::string_view path, std::string_view text)
 	{
 		FILE* output = fopen(path.data(), "w");
 		if (!output)
 			return false;
-		fwrite(text.data(), 1, size, output);
+		fwrite(text.data(), 1, text.size(), output);
 		fclose(output);
 		return true;
 	}
