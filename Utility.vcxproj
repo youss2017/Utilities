@@ -105,8 +105,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CppUtility.hpp" />
+    <ClInclude Include="stb.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="Socket.hpp" />
+    <ClInclude Include="VideoCapture.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />

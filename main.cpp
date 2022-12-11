@@ -4,6 +4,7 @@
 #include <chrono>
 #include <windows.h>
 #include <iostream>
+#include "stb.h"
 
 #define MULITCAST_GROUP "239.5.6.8"
 #define MULTICAST_PORT 2500
@@ -27,13 +28,8 @@ void simple_multicast_listener() {
 }
 
 int main() {
-
-	auto data = ut::ReadAllText("main.cpp");
-
-	ut::Logger::GetGlobalLogger().Options.ShowMessageBoxOnError = true;
-	ut::Logger::GetGlobalLogger().Options.DebugBreakOnError = true;
-
-	LOG(INFO, "Hello My Name is {0}, {1} and I'm {{{2}}}.", "Youssef", "Samwel", 18);
+	cpp::Logger::GetGlobalLogger().Options.ShowMessageBoxOnError = true;
+	cpp::Logger::GetGlobalLogger().Options.DebugBreakOnError = true;
 
 	// Logger testing
 	int8_t _i8x = INT8_MAX;

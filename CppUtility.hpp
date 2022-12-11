@@ -11,10 +11,12 @@
 #include <chrono>
 #include <stdexcept>
 
+#define CPP_UTILITY_NAMESPACE cpp
+
 // #define CPP_UTILITY_IMPLEMENTATION in one of your cpp files (only one)
 // #define LOGGER_DISABLE_LOGGING to disable logging
 
-// #define CPP_UTILITY_IMPLEMENTATION
+//#define CPP_UTILITY_IMPLEMENTATION
 
 #ifdef _WIN32
 #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
@@ -23,12 +25,12 @@
 #endif
 
 #ifndef LOGGER_DISABLE_LOGGING
-#define LOG(logLevel, x, ...) ut::Logger::GetGlobalLogger().print(ut::LogLevel::logLevel, __FILENAME__, __LINE__,  x, __VA_ARGS__)
+#define LOG(logLevel, x, ...) CPP_UTILITY_NAMESPACE ::Logger::GetGlobalLogger().print(CPP_UTILITY_NAMESPACE ::LogLevel::logLevel, __FILENAME__, __LINE__,  x, __VA_ARGS__)
 #else
 #define LOG(logLevel, x, ...)
 #endif
 
-#define LOGEXCEPT(x, ...) { auto err = ut::Format(x, __VA_ARGS__); LOG(ERR, err); throw std::runtime_error(err); }
+#define LOGEXCEPT(x, ...) { auto err = CPP_UTILITY_NAMESPACE ::Format(x, __VA_ARGS__); LOG(ERR, err); throw std::runtime_error(err); }
 
 #ifdef CPP_UTILITY_IMPLEMENTATION
 #ifdef _WIN32
@@ -156,7 +158,8 @@ namespace NMB
 }
 #endif
 
-namespace ut
+
+namespace CPP_UTILITY_NAMESPACE
 {
 	template <typename T>
 	inline static T clamp(T& value, T min, T max)
@@ -441,6 +444,7 @@ namespace ut
 		std::string LoggerOutputFileName;
 		bool ShowMessageBoxOnError = false;
 		bool DebugBreakOnError = false;
+		bool VerboseMode = false;
 	};
 
 	class Logger {
@@ -483,7 +487,7 @@ namespace ut
 				const char* WARNINGLabel = "WARNING";
 				const char* ERRORLabel = "ERROR";
 				const char* UNKNOWNLabel = "UNKNOWN";
-				const char* pLogLevel = nullptr;
+				const char* pLogLevel = "";
 
 				switch (logLevel) {
 				case LogLevel::INFO:
@@ -500,9 +504,14 @@ namespace ut
 					pLogLevel = UNKNOWNLabel;
 					break;
 				}
-				auto x = Format(input, arguments...);
-				result = Format("{0} ({1:%.2fs}) | {2} {3} {4:%-8s} {5}", currentTime, timeSinceStart, fileAndNumber, threadId, pLogLevel,
-					x);
+				if (Options.VerboseMode) {
+					result = Format("{0} ({1:%.2fs}) | {2} {3} {4:%-8s} {5}", currentTime, timeSinceStart, fileAndNumber, threadId, pLogLevel,
+						Format(input, arguments...));
+				}
+				else {
+					result = Format("[{0:%.2fs} | {1}] {2}", timeSinceStart, fileAndNumber,
+						Format(input, arguments...));
+				}
 			}
 			result += "\n";
 			_internal_log(logLevel, result);
@@ -890,7 +899,7 @@ namespace ut
 				if (size == 0)
 				{
 					fclose(input);
-					return {std::vector<uint8_t>()};
+					return { std::vector<uint8_t>() };
 				}
 				fseek(input, 0, SEEK_SET);
 				binary.resize(size + 1);
@@ -1007,7 +1016,7 @@ namespace ut
 			case LogLevel::ERR:
 				std::cout << "\x1B[31m";
 				break;
-					}
+			}
 #endif
 #ifdef _WIN32
 			std::cout << output;
@@ -1015,20 +1024,20 @@ namespace ut
 #else
 			std::cout << output << "\033[0m";
 #endif
-					}
+		}
 		if (Options.LoggerType & LOGGER_TYPE_FILE) {
 			_file_stream << output;
 			_file_stream.flush();
 		}
 		if (logLevel == LogLevel::ERR) {
 			if (Options.ShowMessageBoxOnError) {
-				ut::ShowErrorBox("Encountered an Error", output);
+				CPP_UTILITY_NAMESPACE::ShowErrorBox("Encountered an Error", output);
 			}
 			if (Options.DebugBreakOnError) {
-				ut::DebugBreak();
+				CPP_UTILITY_NAMESPACE::DebugBreak();
 			}
 		}
-		}
+	}
 
 	void Logger::AddFileLogging(const char* FileName)
 	{
@@ -1050,4 +1059,4 @@ namespace ut
 
 #endif
 
-			}
+}
