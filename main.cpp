@@ -4,7 +4,10 @@
 #include <chrono>
 #include <windows.h>
 #include <iostream>
+#include <random>
 #include "stb.h"
+
+// Note: This file is used only for testing and debugging.
 
 #define MULITCAST_GROUP "239.5.6.8"
 #define MULTICAST_PORT 2500
@@ -28,6 +31,45 @@ void simple_multicast_listener() {
 }
 
 int main() {
+	sw::Startup();
+
+	sw::Socket s(sw::SocketType::TCP);
+	s.Bind(sw::SocketInterface::CustomInterface, 0, "127.10.20.30").Listen(1000);
+	
+	auto& ep = s.GetEndpoint();
+	
+	LOG(INFO, "Test {2:.2lf} {0} {}", "Oxygen", "Hydrogen", 10.5);
+	LOG(INFO, "Bound at {0}", ep.ToString());
+	LOG(INFO, "Test {0F} OK {1}", 15, 20);
+
+	auto conn = s.Accept();
+
+	while (true) {
+		char request[5]{};
+		if (conn.Recv(request, 4, false) > 0) {
+			if (cpp::StartsWith(request, "req")) {
+				char dateTime[256]{};
+				auto traw = time(nullptr);
+				tm t;
+				gmtime_s(&t, &traw);
+				strftime(dateTime, 256, "%x %X %p", &t);
+				std::random_device rd;
+				auto msg = cpp::Format("CTime {0} Date {1} Seed {2}\r\n", time(nullptr), dateTime, rd());
+				conn.Send(msg);
+				std::this_thread::sleep_for(std::chrono::milliseconds(250));
+			}
+			else {
+				auto msg = cpp::Format("HTTP/1.1 200 OK\r\nContent-Length: {0}\r\nContent-Type: text/html\r\n\r\n<b>200 OK</b>", strlen("<b>200 OK</b>"));
+				conn.Send(msg);
+			}
+		}
+		else if (!conn.IsConnected()) {
+			conn = s.Accept();
+		}
+	}
+
+	LOG(INFOBOLD, "DISCONNECTED.");
+
 	cpp::Logger::GetGlobalLogger().Options.ShowMessageBoxOnError = true;
 	cpp::Logger::GetGlobalLogger().Options.DebugBreakOnError = true;
 

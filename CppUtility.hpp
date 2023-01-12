@@ -11,12 +11,14 @@
 #include <chrono>
 #include <stdexcept>
 
+#ifndef CPP_UTILITY_NAMESPACE
 #define CPP_UTILITY_NAMESPACE cpp
+#endif
 
 // #define CPP_UTILITY_IMPLEMENTATION in one of your cpp files (only one)
-// #define LOGGER_DISABLE_LOGGING to disable logging
+// #define LOGGER_DISABLE_LOGGING to disable logging macro
 
-//#define CPP_UTILITY_IMPLEMENTATION
+// #define CPP_UTILITY_IMPLEMENTATION
 
 #ifdef _WIN32
 #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
@@ -315,7 +317,9 @@ namespace CPP_UTILITY_NAMESPACE
 		bool closebracket = false;
 		bool formatSpecifier = false;
 		int argumentId = 0;
-		char argumentFormatSpecifier[30]{};
+		int argumentIdCounter = 0;
+		bool hasArgumentId = false;
+		std::string argumentFormatSpecifier{};
 		int formatSpecifierIndex = 0;
 		for (int i = 0; i < input.size(); i++) {
 			if (input[i] == '{') {
@@ -330,12 +334,12 @@ namespace CPP_UTILITY_NAMESPACE
 			}
 			if (input[i] == ':' && openbracket) {
 				formatSpecifier = true;
-				formatSpecifierIndex = 0;
-				memset(argumentFormatSpecifier, 0, sizeof(argumentFormatSpecifier));
+				argumentFormatSpecifier.clear();
+				argumentFormatSpecifier.reserve(10);
 				continue;
 			}
 			if (formatSpecifier && openbracket && input[i] != '}') {
-				argumentFormatSpecifier[formatSpecifierIndex++] = input[i];
+				argumentFormatSpecifier.push_back(input[i]);
 				continue;
 			}
 			if (openbracket) {
@@ -346,26 +350,26 @@ namespace CPP_UTILITY_NAMESPACE
 					continue;
 				}
 				switch (input[i]) {
-				case '0': argumentId = argumentId * 10 + 0; break;
-				case '1': argumentId = argumentId * 10 + 1; break;
-				case '2': argumentId = argumentId * 10 + 2; break;
-				case '3': argumentId = argumentId * 10 + 3; break;
-				case '4': argumentId = argumentId * 10 + 4; break;
-				case '5': argumentId = argumentId * 10 + 5; break;
-				case '6': argumentId = argumentId * 10 + 6; break;
-				case '7': argumentId = argumentId * 10 + 7; break;
-				case '8': argumentId = argumentId * 10 + 8; break;
-				case '9': argumentId = argumentId * 10 + 9; break;
+				case '0': argumentId = argumentId * 10 + 0; hasArgumentId = true; break;
+				case '1': argumentId = argumentId * 10 + 1; hasArgumentId = true; break;
+				case '2': argumentId = argumentId * 10 + 2; hasArgumentId = true; break;
+				case '3': argumentId = argumentId * 10 + 3; hasArgumentId = true; break;
+				case '4': argumentId = argumentId * 10 + 4; hasArgumentId = true; break;
+				case '5': argumentId = argumentId * 10 + 5; hasArgumentId = true; break;
+				case '6': argumentId = argumentId * 10 + 6; hasArgumentId = true; break;
+				case '7': argumentId = argumentId * 10 + 7; hasArgumentId = true; break;
+				case '8': argumentId = argumentId * 10 + 8; hasArgumentId = true; break;
+				case '9': argumentId = argumentId * 10 + 9; hasArgumentId = true; break;
 				case '}': {
-					auto& e = vec[argumentId];
+					auto& e = vec[hasArgumentId ? argumentId : argumentIdCounter];
 					std::string argument_output;
-
 #define set_argument_output(type) \
 						{\
 							if (formatSpecifier) {\
-								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, type);\
+								if(argumentFormatSpecifier[0] != '%') { argumentFormatSpecifier = "%" + argumentFormatSpecifier; }\
+								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier.c_str(), type);\
 								argument_output.resize(nbytes);\
-								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, type);\
+								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier.c_str(), type);\
 								argument_output.pop_back();\
 							}\
 							else\
@@ -388,9 +392,9 @@ namespace CPP_UTILITY_NAMESPACE
 					case any::Double: set_argument_output(e.get_double());
 					case any::String: {
 						if (formatSpecifier) {
-							size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_string());
+							size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier.c_str(), e.get_string());
 							argument_output.resize(nbytes);
-							snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_string());
+							snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier.c_str(), e.get_string());
 							argument_output.pop_back();
 						}
 						else
@@ -399,23 +403,32 @@ namespace CPP_UTILITY_NAMESPACE
 					}
 					case any::Ptr: {
 						if (!formatSpecifier) {
-							strcat(argumentFormatSpecifier, "%p");
+							argumentFormatSpecifier += "%p";
 						}
-						size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier, e.get_float());
+						size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier.c_str(), e.get_ptr());
 						argument_output.resize(nbytes);
-						snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier, e.get_float());
+						snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier.c_str(), e.get_ptr());
 						argument_output.pop_back();
 						break;
 					}
 					}
 					result.append(argument_output);
 					openbracket = false;
+					if (hasArgumentId)
+						argumentIdCounter = argumentId + 1;
+					else
+						argumentIdCounter++;
 					argumentId = 0;
+					hasArgumentId = false;
 					formatSpecifier = false;
 #undef set_argument_output
 					break;
 				}
-				default: openbracket = false;
+				default:
+					result += "{INVALID}";
+					argumentId = 0;
+					openbracket = false;
+					hasArgumentId = false;
 				}
 			}
 			else {
@@ -509,7 +522,7 @@ namespace CPP_UTILITY_NAMESPACE
 						Format(input, arguments...));
 				}
 				else {
-					result = Format("[{0:%.2fs} | {1}] {2}", timeSinceStart, fileAndNumber,
+					result = Format("[{0:%.2fs} |{1}] {2}", timeSinceStart, fileAndNumber,
 						Format(input, arguments...));
 				}
 			}

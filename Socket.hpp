@@ -117,17 +117,17 @@ namespace sw {
 	};
 
 	struct Endpoint {
-		std::string mAddress;
-		uint16_t mPort = 0;
+		std::string Address;
+		uint16_t Port = 0;
 
 		Endpoint() = default;
 		Endpoint(uint16_t Port) {
-			mAddress = "0.0.0.0";
-			mPort = Port;
+			Address = "0.0.0.0";
+			Port = Port;
 		}
 		Endpoint(const std::string& Address, uint16_t Port) {
-			mAddress = Address;
-			mPort = Port;
+			this->Address = Address;
+			this->Port = Port;
 		}
 
 		/// <summary>
@@ -143,7 +143,7 @@ namespace sw {
 		}
 
 		constexpr std::string ToString() const {
-			return mAddress + ":" + std::to_string(mPort);
+			return Address + ":" + std::to_string(Port);
 		}
 
 		constexpr operator std::string() const {
@@ -390,8 +390,8 @@ namespace sw {
 		}
 		mSocket = ::socket(domain, typeInt, ipproto);
 		mType = type;
-		mEndpoint.mPort = 0;
-		mEndpoint.mAddress = "0.0.0.0";
+		mEndpoint.Port = 0;
+		mEndpoint.Address = "0.0.0.0";
 		if (mSocket < 0)
 			Socket_ThrowException();
 	}
@@ -429,7 +429,7 @@ namespace sw {
 		switch (interfaceType)
 		{
 		case SocketInterface::Loopback:
-			addr.sin_addr.s_addr = INADDR_LOOPBACK;
+			addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 			break;
 		case SocketInterface::Any:
 			addr.sin_addr.s_addr = INADDR_ANY;
@@ -440,7 +440,7 @@ namespace sw {
 		}
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(port);
-		mEndpoint.mPort = port;
+		mEndpoint.Port = port;
 		if (::bind(mSocket, (sockaddr*)&addr, sizeof(addr)) < 0)
 		{
 			Socket_ThrowException();
@@ -449,7 +449,8 @@ namespace sw {
 			sockaddr_in sin{};
 			int len = sizeof(sockaddr_in);
 			getsockname(mSocket, (sockaddr*)&sin, &len);
-			mEndpoint.mPort = ntohs(sin.sin_port);
+			mEndpoint.Address = inet_ntoa(sin.sin_addr);
+			mEndpoint.Port = ntohs(sin.sin_port);
 		}
 		return *this;
 	}
@@ -518,9 +519,9 @@ namespace sw {
 		u_long broadcastEnable = 1;
 		::setsockopt(mSocket, SOL_SOCKET, SO_BROADCAST, (const char*)&broadcastEnable, sizeof(broadcastEnable));
 		sockaddr_in dest{};
-		dest.sin_addr.s_addr = inet_addr(endpoint.mAddress.c_str());
+		dest.sin_addr.s_addr = inet_addr(endpoint.Address.c_str());
 		dest.sin_family = AF_INET;
-		dest.sin_port = htons(endpoint.mPort);
+		dest.sin_port = htons(endpoint.Port);
 		socklen_t len = sizeof(dest);
 		int32_t sentBytes = ::sendto(mSocket, (const char*)pData, size, 0, (sockaddr*)&dest, len);
 		return sentBytes;
@@ -566,8 +567,8 @@ namespace sw {
 		int recvBytes = ::recvfrom(mSocket, (char*)pData, size, 0, (sockaddr*)&src, &len);
 		if (PacketSource)
 		{
-			PacketSource->mAddress = inet_ntoa(src.sin_addr);
-			PacketSource->mPort = ntohs(src.sin_port);
+			PacketSource->Address = inet_ntoa(src.sin_addr);
+			PacketSource->Port = ntohs(src.sin_port);
 		}
 		return recvBytes;
 	}
