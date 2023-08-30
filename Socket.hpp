@@ -22,7 +22,6 @@
 #include <ifaddrs.h>
 #include <cstring>
 #else
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <winsock2.h>
 #include <Windows.h>
 #include <iphlpapi.h>
