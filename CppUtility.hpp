@@ -3,6 +3,7 @@
 #include <vector>
 #include <string_view>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <cstdint>
 #include <string>
@@ -242,13 +243,13 @@ namespace CPP_UTILITY_NAMESPACE
 	/// Reads file binary into vector. First element in vector determines success status.
 	/// </summary>
 	/// <returns>First element in vector determines success status. 1 == success, 0 == fail</returns>
-	std::optional<std::vector<uint8_t>> ReadAllBytes(std::string_view path);
+	std::optional<std::vector<uint8_t>> ReadAllBytes(const std::string& path);
 
 	/// <summary>
-	/// Reads file binary into vector. First element in vector determines success status.
+	/// Reads file binary into string.
 	/// </summary>
-	/// <returns>First element in vector determines success status. 1 == success, 0 == fail</returns>
-	std::optional<std::string> ReadAllText(std::string_view path);
+	/// <returns></returns>
+	std::optional<std::string> ReadAllText(const std::string& path);
 
 	bool Exists(std::string_view path);
 	std::string ReadLine(FILE* file);
@@ -316,6 +317,7 @@ namespace CPP_UTILITY_NAMESPACE
 		bool openbracket = false;
 		bool closebracket = false;
 		bool formatSpecifier = false;
+		bool clearLine = false;
 		int argumentId = 0;
 		int argumentIdCounter = 0;
 		bool hasArgumentId = false;
@@ -363,7 +365,7 @@ namespace CPP_UTILITY_NAMESPACE
 				case '}': {
 					auto& e = vec[hasArgumentId ? argumentId : argumentIdCounter];
 					std::string argument_output;
-#define set_argument_output(type) \
+						#define set_argument_output(type) \
 						{\
 							if (formatSpecifier) {\
 								if(argumentFormatSpecifier[0] != '%') { argumentFormatSpecifier = "%" + argumentFormatSpecifier; }\
@@ -434,6 +436,9 @@ namespace CPP_UTILITY_NAMESPACE
 			else {
 				result += input[i];
 			}
+		}
+		if (clearLine) {
+			result = "\33[2K\r" + result;
 		}
 		return result;
 	}
@@ -829,41 +834,25 @@ namespace CPP_UTILITY_NAMESPACE
 		}
 	}
 
-	std::optional<std::string> ReadAllText(std::string_view path)
+	std::optional<std::string> ReadAllText(const std::string& path)
 	{
-		std::string text;
-		try
-		{
-			std::filesystem::path location(path);
-			if (std::filesystem::is_regular_file(location))
-			{
-				FILE* input = fopen(path.data(), "r");
-				if (!input)
-				{
-					return {};
-				}
-				fseek(input, 0, SEEK_END);
-				size_t size = ftell(input);
-				if (size == 0)
-				{
-					fclose(input);
-					return "";
-				}
-				fseek(input, 0, SEEK_SET);
-				text.resize(size + 1);
-				size = fread(&text[0], 1, size, input);
-				fclose(input);
-				text.resize(size + 1);
-				text.shrink_to_fit();
-			}
+		// Open the file for reading
+		std::ifstream file(path);
+
+		// Check if the file was opened successfully
+		if (!file.is_open()) {
+			return std::nullopt;
 		}
-		catch (std::exception)
-		{
-			return {};
-		}
-		if (text.size() == 0) return {};
-		text.push_back('\0');
-		return text;
+
+		// Read the contents of the file into a stringstream
+		std::stringstream ss;
+		ss << file.rdbuf();
+
+		// Close the file
+		file.close();
+
+		// Return the contents of the stringstream as an std::string
+		return ss.str();
 	}
 
 	bool Exists(std::string_view path)
@@ -895,40 +884,30 @@ namespace CPP_UTILITY_NAMESPACE
 		return true;
 	}
 
-	std::optional<std::vector<uint8_t>> ReadAllBytes(std::string_view path)
+	std::optional<std::vector<uint8_t>> ReadAllBytes(const std::string& path)
 	{
-		std::vector<uint8_t> binary;
-		try
-		{
-			std::filesystem::path location(path);
-			if (std::filesystem::is_regular_file(location))
-			{
-				FILE* input = fopen(path.data(), "rb");
-				if (!input)
-				{
-					return binary;
-				}
-				fseek(input, 0, SEEK_END);
-				size_t size = ftell(input);
-				if (size == 0)
-				{
-					fclose(input);
-					return { std::vector<uint8_t>() };
-				}
-				fseek(input, 0, SEEK_SET);
-				binary.resize(size + 1);
-				size = fread(&binary[0], 1, size, input);
-				fclose(input);
-				binary.resize(size + 1);
-				binary.shrink_to_fit();
-			}
+		// Open the file for reading in binary mode
+		std::ifstream file(path, std::ios::binary);
+
+		// Check if the file was opened successfully
+		if (!file.is_open()) {
+			return std::nullopt;
 		}
-		catch (...)
-		{
-			return {};
-		}
-		if (binary.size() == 0) return {};
-		return binary;
+
+		// Determine the size of the file
+		file.seekg(0, std::ios::end);
+		std::streampos fileSize = file.tellg();
+		file.seekg(0, std::ios::beg);
+
+		// Read the contents of the file into a vector
+		std::vector<uint8_t> buffer(fileSize);
+		file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
+
+		// Close the file
+		file.close();
+
+		// Return the vector containing the contents of the file
+		return buffer;
 	}
 
 	bool WriteAllBytes(std::string_view path, const void* data, size_t size)
