@@ -3,7 +3,7 @@
 // Code style inspired by Nothings STB
 // Define SOCKET_API_IMPLEMENTATION in one of your CPP files
 // #define SOCKET_API_IMPLEMENTATION
-
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <string>
 #include <cstdint>
 #include <vector>
@@ -61,7 +61,7 @@ namespace sw {
 			std::stringstream ss;
 			auto flagSet = [](uint32_t test, uint32_t input) {
 				return (input & test) ? "true" : "false";
-			};
+				};
 			auto ipToArrayString = [](const std::vector<std::string>& source) {
 				std::stringstream ss;
 				ss << "[";
@@ -72,7 +72,7 @@ namespace sw {
 				}
 				ss << "]";
 				return ss.str();
-			};
+				};
 			ss << "\"Name\": \"" << Name << "\",\n\"Description\": \"" << Description << "\",\n\"Data\": { \n\t\"IPv4\": " << ipToArrayString(IPv4Address)
 				<< ",\n\t\"Subnet\": " << ipToArrayString(SubnetAddress)
 				<< ",\n\t\"Broadcast\": " << ipToArrayString(BroadcastAddress)
@@ -161,7 +161,7 @@ namespace sw {
 	public:
 		Socket() = default;
 		Socket(uint64_t RawSocketHandle, SocketType type, const Endpoint& Endpoint, bool IsConnected) :
-			mSocket(RawSocketHandle), mType(type), mEndpoint(Endpoint), mIsConnected(IsConnected) {
+			mSocket(RawSocketHandle), mType(type), mEndpoint(Endpoint) {
 			if (IsConnected) mConnectedTimestamp = time(NULL);
 		}
 		Socket(SocketType type);
@@ -274,17 +274,13 @@ namespace sw {
 			return mIsBlocking;
 		}
 
-		constexpr bool IsConnected() const
-		{
-			return mIsConnected;
-		}
+		bool IsConnected() const;
 
 		constexpr uint64_t SockFd() const { return mSocket; }
 		// time(NULL) when connection was established
 		constexpr uint64_t ConnectedTimestamp() const { return mConnectedTimestamp; }
 
 	private:
-		bool mIsConnected = false;
 		uint64_t mSocket = 0;
 		SocketType mType = SocketType::TCP;
 		Endpoint mEndpoint = { "0.0.0.0", 0 };
@@ -325,29 +321,6 @@ namespace sw {
 		error.sErrorString = s;
 #endif
 		return error;
-	}
-
-	// Returns true if socket is still connected.
-	bool GetSocketConnectionStateFromError(uint64_t sockFd) {
-#ifdef _WIN32
-		int error = WSAGetLastError();
-		// Use select to check if the socket is closed without waiting
-		fd_set readSet;
-		FD_ZERO(&readSet);
-		FD_SET(sockFd, &readSet);
-
-		timeval timeout = {};
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 0;
-
-		auto iResult = select(0, &readSet, NULL, NULL, &timeout);
-		if (iResult == SOCKET_ERROR) {
-			return false;
-		}
-		return true;
-#else
-#error "Not supported"
-#endif
 	}
 
 	static void Socket_ThrowException(bool invalidArgs = false, const char* detailedError = nullptr)
@@ -435,6 +408,24 @@ namespace sw {
 #endif
 	}
 
+	bool Socket::IsConnected() const {
+#ifdef _WIN32
+		pollfd query = {};
+		query.fd = mSocket;
+		query.events = POLLRDNORM;
+		if (WSAPoll(&query, 1, 0) == SOCKET_ERROR) {
+			auto error = WSAGetLastError();
+			return false;
+		}
+		if (query.revents & POLLHUP) {
+			return false;
+		}
+		return true;
+#else
+#error "Not supported"
+#endif
+	}
+
 	// Throws Exception on failure
 	Socket& Socket::Bind(SocketInterface interfaceType, uint16_t port, const char* customInterface)
 	{
@@ -484,11 +475,9 @@ namespace sw {
 		addr.sin_family = AF_INET;
 		if (::connect(mSocket, (sockaddr*)&addr, sizeof(addr)) == 0)
 		{
-			mIsConnected = true;
 			mConnectedTimestamp = time(NULL);
 		}
 		else {
-			mIsConnected = 0;
 			mConnectedTimestamp = 0;
 		}
 		return *this;
@@ -509,9 +498,6 @@ namespace sw {
 		if (size == 0) return 0;
 		assert(mType == SocketType::TCP && "Must be TCP Socket to use Send Function()");
 		int32_t readBytes = ::send(mSocket, (const char*)pData, size, 0);
-		if (readBytes == 0) mIsConnected = false;
-		if (readBytes < 0)
-			mIsConnected = GetSocketConnectionStateFromError(mSocket);
 		return readBytes;
 	}
 
@@ -552,12 +538,10 @@ namespace sw {
 		int flags = (Peek ? MSG_PEEK : 0) | (WaitAll ? MSG_WAITALL : 0);
 		int32_t recvBytes = ::recv(mSocket, (char*)pOutData, size, flags);
 		if (recvBytes == 0) {
-			mIsConnected = false;
 			return 0;
 		}
 		if (recvBytes < 0)
 		{
-			mIsConnected = GetSocketConnectionStateFromError(mSocket);
 			return 0;
 		}
 		return recvBytes;
@@ -629,7 +613,6 @@ namespace sw {
 #else
 		::shutdown(mSocket, SHUT_RDWR);
 #endif
-		mIsConnected = false;
 		return *this;
 	}
 
@@ -650,7 +633,7 @@ namespace sw {
 
 	bool Socket::IsValid()
 	{
-		return mSocket > 0;
+		return (mSocket > 0) && (mSocket != uint32_t(-1));
 	}
 
 	void Socket::WaitForData(int32_t timeout)
@@ -762,7 +745,7 @@ namespace sw {
 					output[1] = uint8_t(std::stoul(ip.substr(ip_d0 + 1, ip_d1 - ip_d0 - 1)));
 					output[2] = uint8_t(std::stoul(ip.substr(ip_d1 + 1, ip_d2 - ip_d1 - 1)));
 					output[3] = uint8_t(std::stoul(ip.substr(ip_d2 + 1)));
-				};
+					};
 				uint8_t ip8[4];
 				uint8_t mask8[4];
 				extractIpFromString(mask, mask8);
@@ -823,13 +806,13 @@ namespace sw {
 		if (setsockopt(mSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
 			throw std::runtime_error("Failed to join multicast group.");
 		}
-//		in_addr localInterface{};
-//		localInterface.s_addr = inet_addr(GroupAddress.c_str());
-//		if (setsockopt(mSocket, IPPROTO_IP, IP_MULTICAST_IF, (char*)&localInterface, sizeof(localInterface)) < 0)
-//
-//		{
-//			throw std::runtime_error("Failed to join multicast group. (2)");
-//}
+		//		in_addr localInterface{};
+		//		localInterface.s_addr = inet_addr(GroupAddress.c_str());
+		//		if (setsockopt(mSocket, IPPROTO_IP, IP_MULTICAST_IF, (char*)&localInterface, sizeof(localInterface)) < 0)
+		//
+		//		{
+		//			throw std::runtime_error("Failed to join multicast group. (2)");
+		//}
 		return *this;
 	}
 
