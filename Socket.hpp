@@ -327,10 +327,24 @@ namespace sw {
 		return error;
 	}
 
-	bool GetSocketConnectionStateFromError() {
+	// Returns true if socket is still connected.
+	bool GetSocketConnectionStateFromError(uint64_t sockFd) {
 #ifdef _WIN32
 		int error = WSAGetLastError();
-		return (error == WSAEWOULDBLOCK) || (error == WSAEOPNOTSUPP);
+		// Use select to check if the socket is closed without waiting
+		fd_set readSet;
+		FD_ZERO(&readSet);
+		FD_SET(sockFd, &readSet);
+
+		timeval timeout = {};
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 0;
+
+		auto iResult = select(0, &readSet, NULL, NULL, &timeout);
+		if (iResult == SOCKET_ERROR) {
+			return false;
+		}
+		return true;
 #else
 #error "Not supported"
 #endif
@@ -497,7 +511,7 @@ namespace sw {
 		int32_t readBytes = ::send(mSocket, (const char*)pData, size, 0);
 		if (readBytes == 0) mIsConnected = false;
 		if (readBytes < 0)
-			mIsConnected = GetSocketConnectionStateFromError();
+			mIsConnected = GetSocketConnectionStateFromError(mSocket);
 		return readBytes;
 	}
 
@@ -543,7 +557,7 @@ namespace sw {
 		}
 		if (recvBytes < 0)
 		{
-			mIsConnected = GetSocketConnectionStateFromError();
+			mIsConnected = GetSocketConnectionStateFromError(mSocket);
 			return 0;
 		}
 		return recvBytes;

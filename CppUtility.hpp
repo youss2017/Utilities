@@ -176,68 +176,68 @@ namespace CPP_UTILITY_NAMESPACE
 
 	void DebugBreak();
 
-	void ShowInfoBox(std::string_view title, std::string_view text);
-	void ShowWarningBox(std::string_view title, std::string_view text);
-	void ShowErrorBox(std::string_view title, std::string_view text);
+	void ShowInfoBox(const std::string& title, const std::string& text);
+	void ShowWarningBox(const std::string& title, const std::string& text);
+	void ShowErrorBox(const std::string& title, const std::string& text);
 
 	// std::string contains find (IndexOf) rfind(LastIndexOf) substring
 	// for more info lookup std::string::find() and std::string::rfind()
 
-	std::string Replace(std::string_view source, std::string_view find, std::string_view Replace);
-	std::string ReplaceAll(std::string_view source, std::string_view find, std::string_view Replace);
+	std::string Replace(const std::string& source, const std::string& find, const std::string& Replace);
+	std::string ReplaceAll(const std::string& source, const std::string& find, const std::string& Replace);
 	std::wstring Replace(std::wstring_view source, std::wstring_view find, std::wstring_view Replace);
 	std::wstring ReplaceAll(std::wstring_view source, std::wstring_view find, std::wstring_view Replace);
 
-	inline size_t LastIndexOf(std::string_view source, std::string_view find) { return source.rfind(find.data()); }
-	inline size_t IndexOf(std::string_view source, std::string_view find) { return source.find(find.data()); }
+	inline size_t LastIndexOf(const std::string& source, const std::string& find) { return source.rfind(find.data()); }
+	inline size_t IndexOf(const std::string& source, const std::string& find) { return source.find(find.data()); }
 
 	inline size_t LastIndexOf(std::wstring_view source, std::wstring_view find) { return source.rfind(find.data()); }
 	inline size_t IndexOf(std::wstring_view source, std::wstring_view find) { return source.find(find.data()); }
 
-	std::vector<std::string> Split(const std::string& source, std::string_view regex);
+	std::vector<std::string> Split(const std::string& source, const std::string& regex);
 	std::vector<std::wstring> Split(const std::wstring& source, std::wstring_view regex);
 
-	std::string LowerCase(std::string_view source);
-	std::string UpperCase(std::string_view source);
+	std::string LowerCase(const std::string& source);
+	std::string UpperCase(const std::string& source);
 
 	std::wstring LowerCase(std::wstring_view source);
 	std::wstring UpperCase(std::wstring_view source);
 
-	std::wstring ToWideString(std::string_view source);
+	std::wstring ToWideString(const std::string& source);
 	std::string ToAsciiString(std::wstring_view source);
 
-	std::string LTrim(std::string_view source);
-	std::string RTrim(std::string_view source);
-	std::string Trim(std::string_view source);
+	std::string LTrim(const std::string& source);
+	std::string RTrim(const std::string& source);
+	std::string Trim(const std::string& source);
 
 	std::wstring LTrim(std::wstring_view source);
 	std::wstring RTrim(std::wstring_view source);
 	std::wstring Trim(std::wstring_view source);
 
-	bool EqualIgnoreCase(std::string_view a, std::string_view b);
-	bool StartsWith(std::string_view source, std::string_view find);
-	bool EndsWith(std::string_view source, std::string_view find);
-	bool Contains(std::string_view source, std::string_view find);
+	bool EqualIgnoreCase(const std::string& a, const std::string& b);
+	bool StartsWith(const std::string& source, const std::string& find);
+	bool EndsWith(const std::string& source, const std::string& find);
+	bool Contains(const std::string& source, const std::string& find);
 
 	bool EqualIgnoreCase(std::wstring_view a, std::wstring_view b);
 	bool StartsWith(std::wstring_view source, std::wstring_view find);
 	bool EndsWith(std::wstring_view source, std::wstring_view find);
 	bool Contains(std::wstring_view source, std::wstring_view find);
 
-	size_t ToInt64(std::string_view source);
-	bool TryToInt64(std::string_view source, size_t& RefInt64);
+	size_t ToInt64(const std::string& source);
+	bool TryToInt64(const std::string& source, size_t& RefInt64);
 
 	size_t ToInt64(std::wstring_view source);
 	bool TryToInt64(std::wstring_view source, size_t& RefInt64);
 
-	double ToDouble(std::string_view source);
-	bool TryToDouble(std::string_view source, double& RefDouble);
+	double ToDouble(const std::string& source);
+	bool TryToDouble(const std::string& source, double& RefDouble);
 
 	double ToDouble(std::wstring_view source);
 	bool TryToDouble(std::wstring_view source, double& RefDouble);
 
-	bool WriteAllBytes(std::string_view path, const void* data, size_t size);
-	bool WriteAllText(std::string_view path, std::string_view text);
+	bool WriteAllBytes(const std::string& path, const void* data, size_t size);
+	bool WriteAllText(const std::string& path, const std::string& text);
 
 	/// <summary>
 	/// Reads file binary into vector. First element in vector determines success status.
@@ -251,9 +251,9 @@ namespace CPP_UTILITY_NAMESPACE
 	/// <returns></returns>
 	std::optional<std::string> ReadAllText(const std::string& path);
 
-	bool Exists(std::string_view path);
+	bool Exists(const std::string& path);
 	std::string ReadLine(FILE* file);
-	bool CreateEmptyFile(std::string_view path);
+	bool CreateEmptyFile(const std::string& path);
 
 	struct any {
 		enum type { Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float, Double, String, Ptr };
@@ -318,10 +318,14 @@ namespace CPP_UTILITY_NAMESPACE
 		bool closebracket = false;
 		bool formatSpecifier = false;
 		bool clearLine = false;
+		bool negativeArgumentId = false;
+		bool hasArgumentId = false;
+		bool noNewLine = false;
+
 		int argumentId = 0;
 		int argumentIdCounter = 0;
-		bool hasArgumentId = false;
 		std::string argumentFormatSpecifier{};
+		std::string controlWord{};
 		int formatSpecifierIndex = 0;
 		for (int i = 0; i < input.size(); i++) {
 			if (input[i] == '{') {
@@ -352,6 +356,7 @@ namespace CPP_UTILITY_NAMESPACE
 					continue;
 				}
 				switch (input[i]) {
+				case '-': negativeArgumentId = true; break;
 				case '0': argumentId = argumentId * 10 + 0; hasArgumentId = true; break;
 				case '1': argumentId = argumentId * 10 + 1; hasArgumentId = true; break;
 				case '2': argumentId = argumentId * 10 + 2; hasArgumentId = true; break;
@@ -363,9 +368,11 @@ namespace CPP_UTILITY_NAMESPACE
 				case '8': argumentId = argumentId * 10 + 8; hasArgumentId = true; break;
 				case '9': argumentId = argumentId * 10 + 9; hasArgumentId = true; break;
 				case '}': {
-					auto& e = vec[hasArgumentId ? argumentId : argumentIdCounter];
-					std::string argument_output;
-						#define set_argument_output(type) \
+					// negativeArgumentId are control codes
+					if (!negativeArgumentId) {
+						auto& e = vec[hasArgumentId ? argumentId : argumentIdCounter];
+						std::string argument_output;
+#define set_argument_output(type) \
 						{\
 							if (formatSpecifier) {\
 								if(argumentFormatSpecifier[0] != '%') { argumentFormatSpecifier = "%" + argumentFormatSpecifier; }\
@@ -379,58 +386,67 @@ namespace CPP_UTILITY_NAMESPACE
 							break;\
 						}
 
-					switch (e.get_type()) {
-					case any::Int8: set_argument_output(e.get_int8());
-					case any::Int16: set_argument_output(e.get_int16());
-					case any::Int32: set_argument_output(e.get_int32());
-					case any::Int64: set_argument_output(e.get_int64());
+						switch (e.get_type()) {
+						case any::Int8: set_argument_output(e.get_int8());
+						case any::Int16: set_argument_output(e.get_int16());
+						case any::Int32: set_argument_output(e.get_int32());
+						case any::Int64: set_argument_output(e.get_int64());
 
-					case any::UInt8: set_argument_output(e.get_uint8());
-					case any::UInt16: set_argument_output(e.get_uint16());
-					case any::UInt32: set_argument_output(e.get_uint32());
-					case any::UInt64: set_argument_output(e.get_uint64());
+						case any::UInt8: set_argument_output(e.get_uint8());
+						case any::UInt16: set_argument_output(e.get_uint16());
+						case any::UInt32: set_argument_output(e.get_uint32());
+						case any::UInt64: set_argument_output(e.get_uint64());
 
-					case any::Float: set_argument_output(e.get_float());
-					case any::Double: set_argument_output(e.get_double());
-					case any::String: {
-						if (formatSpecifier) {
-							size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier.c_str(), e.get_string());
+						case any::Float: set_argument_output(e.get_float());
+						case any::Double: set_argument_output(e.get_double());
+#undef set_argument_output
+						case any::String: {
+							if (formatSpecifier) {
+								size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier.c_str(), e.get_string());
+								argument_output.resize(nbytes);
+								snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier.c_str(), e.get_string());
+								argument_output.pop_back();
+							}
+							else
+								argument_output = e.get_string();
+							break;
+						}
+						case any::Ptr: {
+							if (!formatSpecifier) {
+								argumentFormatSpecifier += "%p";
+							}
+							size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier.c_str(), e.get_ptr());
 							argument_output.resize(nbytes);
-							snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier.c_str(), e.get_string());
+							snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier.c_str(), e.get_ptr());
 							argument_output.pop_back();
+							break;
 						}
-						else
-							argument_output = e.get_string();
-						break;
-					}
-					case any::Ptr: {
-						if (!formatSpecifier) {
-							argumentFormatSpecifier += "%p";
 						}
-						size_t nbytes = snprintf(nullptr, 0, argumentFormatSpecifier.c_str(), e.get_ptr());
-						argument_output.resize(nbytes);
-						snprintf((char*)argument_output.c_str(), nbytes, argumentFormatSpecifier.c_str(), e.get_ptr());
-						argument_output.pop_back();
-						break;
+						result.append(argument_output);
 					}
-					}
-					result.append(argument_output);
 					openbracket = false;
-					if (hasArgumentId)
+					argumentId *= negativeArgumentId ? -1 : 1;
+					if (argumentId < 0) {
+						noNewLine |= argumentId == -1;
+						clearLine |= argumentId == -2;
+					}
+					else if (hasArgumentId)
 						argumentIdCounter = argumentId + 1;
 					else
 						argumentIdCounter++;
+					// reset state
 					argumentId = 0;
 					hasArgumentId = false;
 					formatSpecifier = false;
-#undef set_argument_output
+					negativeArgumentId = false;
 					break;
 				}
 				default:
 					result += "{INVALID}";
 					argumentId = 0;
-					openbracket = false;
 					hasArgumentId = false;
+					formatSpecifier = false;
+					negativeArgumentId = false;
 				}
 			}
 			else {
@@ -494,45 +510,48 @@ namespace CPP_UTILITY_NAMESPACE
 			double timeSinceStart = double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - _start_timestamp).count()) * 1e-9;
 			uint64_t threadId = _get_current_thread_id();
 			std::string result;
-			{
-				FileName = FileName ? FileName : ".";
-				char fileAndNumber[125]{};
+			FileName = FileName ? FileName : ".";
+			char fileAndNumber[125]{};
 
-				if (Options.IncludeFileAndLine) {
-					sprintf(fileAndNumber, " %s:%03d", FileName, LineNumber);
-				}
-
-				const char* INFOLabel = "INFO";
-				const char* WARNINGLabel = "WARNING";
-				const char* ERRORLabel = "ERROR";
-				const char* UNKNOWNLabel = "UNKNOWN";
-				const char* pLogLevel = "";
-
-				switch (logLevel) {
-				case LogLevel::INFO:
-				case LogLevel::INFOBOLD:
-					pLogLevel = INFOLabel;
-					break;
-				case LogLevel::WARNING:
-					pLogLevel = WARNINGLabel;
-					break;
-				case LogLevel::ERR:
-					pLogLevel = ERRORLabel;
-					break;
-				default:
-					pLogLevel = UNKNOWNLabel;
-					break;
-				}
-				if (Options.VerboseMode) {
-					result = Format("{0} ({1:%.2fs}) | {2} {3} {4:%-8s} {5}", currentTime, timeSinceStart, fileAndNumber, threadId, pLogLevel,
-						Format(input, arguments...));
-				}
-				else {
-					result = Format("[{0:%.2fs} |{1}] {2}", timeSinceStart, fileAndNumber,
-						Format(input, arguments...));
-				}
+			if (Options.IncludeFileAndLine) {
+				sprintf(fileAndNumber, " %s:%03d", FileName, LineNumber);
 			}
-			result += "\n";
+
+			const char* INFOLabel = "INFO";
+			const char* WARNINGLabel = "WARNING";
+			const char* ERRORLabel = "ERROR";
+			const char* UNKNOWNLabel = "UNKNOWN";
+			const char* pLogLevel = "";
+
+			switch (logLevel) {
+			case LogLevel::INFO:
+			case LogLevel::INFOBOLD:
+				pLogLevel = INFOLabel;
+				break;
+			case LogLevel::WARNING:
+				pLogLevel = WARNINGLabel;
+				break;
+			case LogLevel::ERR:
+				pLogLevel = ERRORLabel;
+				break;
+			default:
+				pLogLevel = UNKNOWNLabel;
+				break;
+			}
+			string formatted_input_string = Format(input, arguments...);
+			bool newLine = strncmp("\33[2K\r", formatted_input_string.data(), 5);
+			if (Options.VerboseMode) {
+				result = Format("{0} ({1:%.2fs}) | {2} {3} {4:%-8s} {5}", currentTime, timeSinceStart, fileAndNumber, threadId, pLogLevel,
+					formatted_input_string);
+			}
+			else {
+				result = Format("[{0:%.2fs} |{1}] {2}", timeSinceStart, fileAndNumber,
+					formatted_input_string);
+			}
+			if (newLine) {
+				// doesn't have clear line
+				result += "\n";
+			}
 			_internal_log(logLevel, result);
 		}
 
@@ -562,7 +581,7 @@ namespace CPP_UTILITY_NAMESPACE
 #ifdef CPP_UTILITY_IMPLEMENTATION
 	static std::mutex _console_lock;
 
-	std::string Replace(std::string_view source, std::string_view find, std::string_view Replace)
+	std::string Replace(const std::string& source, const std::string& find, const std::string& Replace)
 	{
 		std::string result = source.data();
 		size_t start_pos = source.find(find);
@@ -572,7 +591,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return result;
 	}
 
-	std::string ReplaceAll(std::string_view source, std::string_view find, std::string_view Replace)
+	std::string ReplaceAll(const std::string& source, const std::string& find, const std::string& Replace)
 	{
 		std::string result = source.data();
 		if (find.empty())
@@ -610,7 +629,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return result;
 	}
 
-	std::vector<std::string> Split(const std::string& source, std::string_view regex)
+	std::vector<std::string> Split(const std::string& source, const std::string& regex)
 	{
 		std::vector<std::string> Split_content;
 		std::regex pattern(regex.data());
@@ -628,7 +647,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return Split_content;
 	}
 
-	std::string LowerCase(std::string_view source)
+	std::string LowerCase(const std::string& source)
 	{
 		std::string lw = source.data();
 		for (int i = 0; i < lw.size(); i++)
@@ -636,7 +655,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return lw;
 	}
 
-	std::string UpperCase(std::string_view source)
+	std::string UpperCase(const std::string& source)
 	{
 		std::string up = source.data();
 		for (int i = 0; i < up.length(); i++)
@@ -660,7 +679,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return up;
 	}
 
-	std::wstring ToWideString(std::string_view source)
+	std::wstring ToWideString(const std::string& source)
 	{
 		std::wstring result;
 		result.resize(source.size());
@@ -676,7 +695,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return result;
 	}
 
-	std::string LTrim(std::string_view source)
+	std::string LTrim(const std::string& source)
 	{
 		std::string s = source.data();
 		s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch)
@@ -684,7 +703,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return s;
 	}
 
-	std::string RTrim(std::string_view source)
+	std::string RTrim(const std::string& source)
 	{
 		std::string s = source.data();
 		s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
@@ -694,7 +713,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return s;
 	}
 
-	std::string Trim(std::string_view source)
+	std::string Trim(const std::string& source)
 	{
 		return RTrim(LTrim(source));
 	}
@@ -722,24 +741,24 @@ namespace CPP_UTILITY_NAMESPACE
 		return RTrim(LTrim(source));
 	}
 
-	bool EqualIgnoreCase(std::string_view a, std::string_view b)
+	bool EqualIgnoreCase(const std::string& a, const std::string& b)
 	{
 		return LowerCase(a) == LowerCase(b);
 	}
 
-	bool StartsWith(std::string_view source, std::string_view find)
+	bool StartsWith(const std::string& source, const std::string& find)
 	{
-		return source.rfind(find, 0) != std::string_view::npos;
+		return source.rfind(find, 0) != std::string::npos;
 	}
 
-	bool EndsWith(std::string_view source, std::string_view find)
+	bool EndsWith(const std::string& source, const std::string& find)
 	{
-		return source.rfind(find) != std::string_view::npos;
+		return source.rfind(find) != std::string::npos;
 	}
 
-	bool Contains(std::string_view source, std::string_view find)
+	bool Contains(const std::string& source, const std::string& find)
 	{
-		return source.find(find) != std::string_view::npos;
+		return source.find(find) != std::string::npos;
 	}
 
 	bool EqualIgnoreCase(std::wstring_view a, std::wstring_view b)
@@ -759,15 +778,15 @@ namespace CPP_UTILITY_NAMESPACE
 
 	bool Contains(std::wstring_view source, std::wstring_view find)
 	{
-		return source.find(find) != std::string_view::npos;
+		return source.find(find) != std::string::npos;
 	}
 
-	size_t ToInt64(std::string_view source)
+	size_t ToInt64(const std::string& source)
 	{
 		return std::stoull(source.data());
 	}
 
-	bool TryToInt64(std::string_view source, size_t& RefInt64)
+	bool TryToInt64(const std::string& source, size_t& RefInt64)
 	{
 		try
 		{
@@ -798,12 +817,12 @@ namespace CPP_UTILITY_NAMESPACE
 		}
 	}
 
-	double ToDouble(std::string_view source)
+	double ToDouble(const std::string& source)
 	{
 		return std::stod(source.data());
 	}
 
-	bool TryToDouble(std::string_view source, double& RefDouble)
+	bool TryToDouble(const std::string& source, double& RefDouble)
 	{
 		try
 		{
@@ -855,7 +874,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return ss.str();
 	}
 
-	bool Exists(std::string_view path)
+	bool Exists(const std::string& path)
 	{
 		return std::filesystem::exists(path);
 	}
@@ -874,7 +893,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return line;
 	}
 
-	bool CreateEmptyFile(std::string_view path)
+	bool CreateEmptyFile(const std::string& path)
 	{
 		FILE* file = fopen(path.data(), "w");
 		if (!file)
@@ -910,7 +929,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return buffer;
 	}
 
-	bool WriteAllBytes(std::string_view path, const void* data, size_t size)
+	bool WriteAllBytes(const std::string& path, const void* data, size_t size)
 	{
 		FILE* output = fopen(path.data(), "wb");
 		if (!output)
@@ -920,7 +939,7 @@ namespace CPP_UTILITY_NAMESPACE
 		return true;
 	}
 
-	bool WriteAllText(std::string_view path, std::string_view text)
+	bool WriteAllText(const std::string& path, const std::string& text)
 	{
 		FILE* output = fopen(path.data(), "w");
 		if (!output)
@@ -939,17 +958,17 @@ namespace CPP_UTILITY_NAMESPACE
 #endif
 	}
 
-	void ShowInfoBox(std::string_view title, std::string_view text)
+	void ShowInfoBox(const std::string& title, const std::string& text)
 	{
 		NMB::show(title.data(), text.data(), NMB::ICON_INFO);
 	}
 
-	void ShowWarningBox(std::string_view title, std::string_view text)
+	void ShowWarningBox(const std::string& title, const std::string& text)
 	{
 		NMB::show(title.data(), text.data(), NMB::ICON_WARNING);
 	}
 
-	void ShowErrorBox(std::string_view title, std::string_view text)
+	void ShowErrorBox(const std::string& title, const std::string& text)
 	{
 		NMB::show(title.data(), text.data(), NMB::ICON_ERROR);
 	}
