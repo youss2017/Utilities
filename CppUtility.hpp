@@ -457,6 +457,7 @@ namespace CPP_UTILITY_NAMESPACE
 		void AddFileLogging(const char* FileName);
 
 		static Logger& GetGlobalLogger();
+		static std::string Escape(const std::string& input);
 
 		template<typename ... Arg>
 		void print(LogLevel logLevel, const char* FileName, int LineNumber, const std::string& input, Arg... arguments) {
@@ -986,6 +987,21 @@ namespace CPP_UTILITY_NAMESPACE
 	{
 		static Logger logger(Logger::GlobalLoggerOptions);
 		return logger;
+	}
+
+	std::string Logger::Escape(const std::string& input)
+	{
+		std::string out;
+		out.reserve(input.size());
+		for (size_t i = 0; i < input.size(); i++) {
+			if (input[i] == '{')
+				out += "{{";
+			else if (input[i] == '}')
+				out += "}}";
+			else
+				out += input[i];
+		}
+		return out;
 	}
 
 	void Logger::_internal_log(LogLevel logLevel, const std::string& output)
