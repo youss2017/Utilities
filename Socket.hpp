@@ -633,7 +633,7 @@ namespace sw {
 
 	bool Socket::IsValid()
 	{
-		return (mSocket > 0) && (mSocket != uint32_t(-1));
+		return (mSocket > 0) && (mSocket != -1);
 	}
 
 	void Socket::WaitForData(int32_t timeout)
