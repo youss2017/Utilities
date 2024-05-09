@@ -597,7 +597,9 @@ namespace sw {
 		{
 			return Socket(0, sw::SocketType::TCP, { "0.0.0.0", 0 }, false);
 		}
-		return Socket(client, SocketType::TCP, { inet_ntoa(addrs.sin_addr), ntohs(addrs.sin_port) }, true);
+		auto conn = Socket(client, SocketType::TCP, { inet_ntoa(addrs.sin_addr), ntohs(addrs.sin_port) }, true);
+		conn.mIsBlocking = mIsBlocking;
+		return conn;
 	}
 
 	const Endpoint& Socket::GetEndpoint()
