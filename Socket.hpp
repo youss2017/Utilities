@@ -16,7 +16,11 @@
 #include <arpa/inet.h>
 #include <netinet/ether.h>
 #include <netinet/if_ether.h>
+#include <netinet/tcp.h>
 #include <sys/ioctl.h>
+#include <net/if.h>
+#include <netdb.h>
+#include <poll.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
@@ -141,11 +145,11 @@ namespace sw {
 			return { address, port };
 		}
 
-		constexpr std::string ToString() const {
+		std::string ToString() const {
 			return Address + ":" + std::to_string(Port);
 		}
 
-		constexpr operator std::string() const {
+		operator std::string() const {
 			return ToString();
 		}
 
@@ -409,21 +413,20 @@ namespace sw {
 	}
 
 	bool Socket::IsConnected() const {
-#ifdef _WIN32
 		pollfd query = {};
 		query.fd = mSocket;
 		query.events = POLLRDNORM;
+#ifdef _WIN32
 		if (WSAPoll(&query, 1, 0) == SOCKET_ERROR) {
-			auto error = WSAGetLastError();
+#else
+		if (poll(&query, 1, 0) == -1) {
+#endif
 			return false;
 		}
 		if (query.revents & POLLHUP) {
 			return false;
 		}
 		return true;
-#else
-#error "Not supported"
-#endif
 	}
 
 	// Throws Exception on failure
@@ -451,7 +454,7 @@ namespace sw {
 		}
 		if (port == 0) {
 			sockaddr_in sin{};
-			int len = sizeof(sockaddr_in);
+			socklen_t len = sizeof(sockaddr_in);
 			getsockname(mSocket, (sockaddr*)&sin, &len);
 			mEndpoint.Address = inet_ntoa(sin.sin_addr);
 			mEndpoint.Port = ntohs(sin.sin_port);
@@ -640,10 +643,14 @@ namespace sw {
 
 	void Socket::WaitForData(int32_t timeout)
 	{
-		WSAPOLLFD fdArray{};
+		pollfd fdArray{};
 		fdArray.fd = mSocket;
 		fdArray.events = POLLRDNORM;
+#ifdef _WIN32
 		::WSAPoll(&fdArray, 1, timeout);
+#else
+		poll(&fdArray, 1, timeout);
+#endif
 	}
 
 	void Socket::WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout)
@@ -659,10 +666,19 @@ namespace sw {
 			fdArray[i].events = POLLRDNORM;
 		}
 		::WSAPoll(fdArray, (uint32_t)Connections.size(), timeout);
-#else
-#error "Not supported"
-#endif
 		_freea(fdArray);
+
+#else
+		pollfd* fdArray = (pollfd*)malloc(sizeof(pollfd) * Connections.size());
+		if (!fdArray)
+			return;
+		for (int i = 0; i < Connections.size(); i++) {
+			fdArray[i].fd = Connections[i].mSocket;
+			fdArray[i].events = POLLRDNORM;
+		}
+		poll(fdArray, (uint32_t)Connections.size(), timeout);
+		free(fdArray);
+#endif
 	}
 
 	void Socket::WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, int32_t timeout)
@@ -677,11 +693,19 @@ namespace sw {
 			fdArray[i].fd = Connections[i]->SockFd();
 			fdArray[i].events = POLLRDNORM;
 		}
-		::WSAPoll(fdArray, (ULONG)Connections.size(), timeout);
-#else
-#error "Not supported"
-#endif
+		::WSAPoll(fdArray, (uint32_t)Connections.size(), timeout);
 		_freea(fdArray);
+#else
+		pollfd* fdArray = (pollfd*)malloc(sizeof(pollfd) * Connections.size());
+		if (!fdArray)
+			return;
+		for (int i = 0; i < Connections.size(); i++) {
+			fdArray[i].fd = Connections[i]->SockFd();
+			fdArray[i].events = POLLRDNORM;
+		}
+		poll(fdArray, (uint32_t)Connections.size(), timeout);
+		free(fdArray);
+#endif
 	}
 
 	void Socket::WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout)
@@ -697,16 +721,25 @@ namespace sw {
 			fdArray[i].events = POLLRDNORM;
 		}
 		::WSAPoll(fdArray, (ULONG)Connections.size(), timeout);
-#else
-#error "Not supported"
-#endif
 		_freea(fdArray);
+#else
+		pollfd* fdArray = (pollfd*)malloc(sizeof(pollfd) * Connections.size());
+		if (!fdArray)
+			return;
+		for (int i = 0; i < Connections.size(); i++) {
+			fdArray[i].fd = Connections[i]->SockFd();
+			fdArray[i].events = POLLRDNORM;
+		}
+		poll(fdArray, (uint32_t)Connections.size(), timeout);
+		free(fdArray);
+#endif
+		
 	}
 
 	std::string Endpoint::GetDomainAddress(const std::string& domain, const char* ServicesName)
 	{
-		ADDRINFOA hints{};
-		PADDRINFOA result{};
+		addrinfo hints{};
+    	addrinfo* result{};
 		hints.ai_family = AF_INET;
 		getaddrinfo(domain.c_str(), ServicesName, &hints, &result);
 		if (!result)
@@ -786,7 +819,56 @@ namespace sw {
 		}
 		// delete[] adapterInfo;
 #else
-#error "Not Implemented"
+    struct ifaddrs* ifAddrStruct = nullptr;
+    struct ifaddrs* ifa = nullptr;
+
+    getifaddrs(&ifAddrStruct);
+
+    for (ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr) continue;
+        if (ifa->ifa_addr->sa_family == AF_INET) { // IPv4
+            NetworkAdapter na;
+            na.Name = ifa->ifa_name;
+
+            struct sockaddr_in* addr = reinterpret_cast<struct sockaddr_in*>(ifa->ifa_addr);
+            char ipAddr[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &(addr->sin_addr), ipAddr, INET_ADDRSTRLEN);
+            na.IPv4Address.push_back(ipAddr);
+
+            struct sockaddr_in* mask = reinterpret_cast<struct sockaddr_in*>(ifa->ifa_netmask);
+            char maskAddr[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &(mask->sin_addr), maskAddr, INET_ADDRSTRLEN);
+            na.SubnetAddress.push_back(maskAddr);
+
+            // Calculate broadcast address
+            struct sockaddr_in broadcastAddr;
+            memset(&broadcastAddr, 0, sizeof(broadcastAddr));
+            broadcastAddr.sin_family = AF_INET;
+            broadcastAddr.sin_addr.s_addr = (addr->sin_addr.s_addr & mask->sin_addr.s_addr) | ~mask->sin_addr.s_addr;
+            char broadcastStr[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &(broadcastAddr.sin_addr), broadcastStr, INET_ADDRSTRLEN);
+            na.BroadcastAddress.push_back(broadcastStr);
+
+            // Get gateway address
+            int fd = socket(AF_INET, SOCK_DGRAM, 0);
+            struct ifreq ifr;
+            memset(&ifr, 0, sizeof(ifr));
+            strncpy(ifr.ifr_name, ifa->ifa_name, IFNAMSIZ - 1);
+            ioctl(fd, SIOCGIFADDR, &ifr);
+            close(fd);
+            na.GatewayAddress = inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr);
+
+            // Fill other fields as needed
+            na.Description = ""; // You can set the description based on the interface type or other information
+            na.TypeFlags = 0; // You can set type flags based on interface properties
+
+            result.push_back(na);
+        }
+    }
+
+    if (ifAddrStruct != nullptr) freeifaddrs(ifAddrStruct);
+
+    return result;
 #endif
 		return result;
 	}
