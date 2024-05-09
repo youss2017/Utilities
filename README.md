@@ -12,4 +12,4 @@
 	<li>Message Boxes</li>
 </ul>
 <h3>Socket.hpp</h3>
-<p>Socket Wrapper for WINSOCK and POSIX sockets and provides some useful functions such as IsConnected</p>
+<p>Socket Wrapper for WINSOCK and POSIX sockets and provides some useful functions.</p>
