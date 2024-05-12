@@ -174,6 +174,56 @@ namespace CPP_UTILITY_NAMESPACE
 		return value;
 	}
 
+	namespace Base64 {
+		std::string Encode(const std::string& data);
+		std::string Encode(const unsigned char* data, size_t len);
+		std::vector<uint8_t> Decode(const std::string& input);
+		std::string DecodeString(const std::string& input);
+	};
+
+
+	class SHA1 {
+
+	public:
+		static std::string hash(const std::vector<uint8_t>& message);
+
+		static inline constexpr uint32_t S(uint32_t X, uint8_t n) {
+			return (X << n) | (X >> 32 - n);
+		}
+
+		static constexpr uint32_t f(int t, uint32_t B, uint32_t C, uint32_t D) {
+			//      f(t;B,C,D) =          (B AND C) OR ((NOT B) AND D) ( 0 <= t <= 19)
+			if (0 <= t && t <= 19) return (B & C) | ((~B) & D);
+			//       f(t;B,C,D) =          B XOR C XOR D                        (20 <= t <= 39)
+			if (20 <= t && t <= 39) return B ^ C ^ D;
+			//       f(t;B,C,D) =          (B AND C) OR (B AND D) OR (C AND D)  (40 <= t <= 59)
+			if (40 <= t && t <= 59) return (B & C) | (B & D) | (C & D);
+			//       f(t;B,C,D) = B XOR C XOR D                        (60 <= t <= 79).
+			return                B ^ C ^ D;
+		}
+
+		static constexpr uint32_t K(int t) {
+			if (0 <= t && t <= 19) return 0x5A827999;
+			if (20 <= t && t <= 39) return 0x6ED9EBA1;
+			if (40 <= t && t <= 59) return 0x8F1BBCDC;
+			return 0xCA62C1D6;
+		}
+
+
+	private:
+		static std::vector<uint8_t> _pad_message(size_t messageSize);
+
+	private:
+		size_t m_messageLength = 0;
+		uint32_t H0 = 0x67452301;
+		uint32_t H1 = 0xEFCDAB89;
+		uint32_t H2 = 0x98BADCFE;
+		uint32_t H3 = 0x10325476;
+		uint32_t H4 = 0xC3D2E1F0;
+	};
+
+
+
 	void DebugBreak();
 
 	void ShowInfoBox(const std::string& title, const std::string& text);
@@ -579,7 +629,173 @@ namespace CPP_UTILITY_NAMESPACE
 	};
 
 #ifdef CPP_UTILITY_IMPLEMENTATION
+	using namespace std;
 	static std::mutex _console_lock;
+
+	namespace Base64 {
+		string Encode(const string& data) {
+			return Encode((const unsigned char*)data.c_str(), data.length());
+		}
+
+		string Encode(const unsigned char* data, size_t len) {
+			const std::string base64_chars =
+				"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+				"abcdefghijklmnopqrstuvwxyz"
+				"0123456789+/";
+
+			std::string encoded;
+			encoded.reserve(((len + 2) / 3) * 4);
+
+			for (size_t i = 0; i < len; i += 3) {
+				unsigned char b0 = data[i];
+				unsigned char b1 = (i + 1 < len) ? data[i + 1] : 0;
+				unsigned char b2 = (i + 2 < len) ? data[i + 2] : 0;
+
+				unsigned char enc1 = b0 >> 2;
+				unsigned char enc2 = ((b0 & 0x03) << 4) | (b1 >> 4);
+				unsigned char enc3 = ((b1 & 0x0F) << 2) | (b2 >> 6);
+				unsigned char enc4 = b2 & 0x3F;
+
+				encoded.push_back(base64_chars[enc1]);
+				encoded.push_back(base64_chars[enc2]);
+				encoded.push_back((i + 1 < len) ? base64_chars[enc3] : '=');
+				encoded.push_back((i + 2 < len) ? base64_chars[enc4] : '=');
+			}
+
+			return encoded;
+		}
+
+		vector<uint8_t> Decode(const std::string& input) {
+			const std::string base64_chars =
+				"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+				"abcdefghijklmnopqrstuvwxyz"
+				"0123456789+/";
+
+			std::vector<unsigned char> binary;
+			binary.reserve((input.size() / 4) * 3);
+
+			for (size_t i = 0; i < input.size(); i += 4) {
+				unsigned char enc1 = input[i];
+				unsigned char enc2 = input[i + 1];
+				unsigned char enc3 = input[i + 2];
+				unsigned char enc4 = input[i + 3];
+
+				unsigned char b0 = (base64_chars.find(enc1) << 2) | (base64_chars.find(enc2) >> 4);
+				unsigned char b1 = ((base64_chars.find(enc2) & 0x0F) << 4) | (base64_chars.find(enc3) >> 2);
+				unsigned char b2 = ((base64_chars.find(enc3) & 0x03) << 6) | base64_chars.find(enc4);
+
+				binary.push_back(b0);
+				if (enc3 != '=')
+					binary.push_back(b1);
+				if (enc4 != '=')
+					binary.push_back(b2);
+			}
+
+			return binary;
+		}
+
+		string DecodeString(const std::string& input) {
+			auto binary = Decode(input);
+			return string(binary.begin(), binary.end());
+		}
+
+	}
+
+	string SHA1::hash(const vector<uint8_t>& message)
+	{
+		uint32_t H0 = 0x67452301;
+		uint32_t H1 = 0xEFCDAB89;
+		uint32_t H2 = 0x98BADCFE;
+		uint32_t H3 = 0x10325476;
+		uint32_t H4 = 0xC3D2E1F0;
+
+		auto padding = _pad_message(message.size());
+		// display_stream(padding);
+		size_t totalSize = message.size() + padding.size();
+		for (size_t blockCount = 0; blockCount < totalSize / (512 / 8); blockCount++) {
+			uint32_t W[80] = {};
+			size_t start = blockCount * (512 / 8);
+			//const uint8_t* M = &padding[start];
+
+			auto readByte = [&](size_t t) {
+				t += start;
+				if (t < message.size()) return message[t];
+				return padding[t - message.size()];
+				};
+
+			for (int t = 0; t < 16; t++)
+			{
+				/*W[t]  = M[t * 4] << 24;
+				W[t] |= M[t * 4 + 1] << 16;
+				W[t] |= M[t * 4 + 2] << 8;
+				W[t] |= M[t * 4 + 3];*/
+				W[t] = readByte(t * 4) << 24;
+				W[t] |= readByte(t * 4 + 1) << 16;
+				W[t] |= readByte(t * 4 + 2) << 8;
+				W[t] |= readByte(t * 4 + 3);
+			}
+
+			for (int t = 16; t < 80; t++) {
+				// W(t) = S^1(W(t-3) XOR W(t-8) XOR W(t-14) XOR W(t-16))
+				W[t] = S(W[t - 3] ^ W[t - 8] ^ W[t - 14] ^ W[t - 16], 1);
+			}
+			uint32_t A = H0;
+			uint32_t B = H1;
+			uint32_t C = H2;
+			uint32_t D = H3;
+			uint32_t E = H4;
+			for (int t = 0; t < 80; t++) {
+				uint32_t TEMP = S(A, 5) + f(t, B, C, D) + E + W[t] + K(t);
+				E = D;  D = C;  C = S(B, 30);  B = A; A = TEMP;
+			}
+			H0 = H0 + A;
+			H1 = H1 + B;
+			H2 = H2 + C;
+			H3 = H3 + D;
+			H4 = H4 + E;
+		}
+		char szBuf[10 * 8];
+		sprintf(szBuf, "%08x%08x%08x%08x%08x", H0, H1, H2, H3, H4);
+		return szBuf;
+	}
+
+	vector<uint8_t> SHA1::_pad_message(size_t messageSize) {
+		vector<uint8_t> padding;
+		padding.push_back(0x80); // append 1
+
+		size_t totalSize = messageSize + 1;
+
+		// 1) Get Last 512-bit block
+		auto _512BlockCount = totalSize / (512 / 8);
+		auto byteOffset = (_512BlockCount * (512 / 8));
+		auto remainingBytes = (512 / 8) - (totalSize - byteOffset);
+		// Do we have the last 64 bits (8 bytes) free?
+		if (remainingBytes < 8) {
+			// get new block
+			// finish current block
+			for (int i = 0; i < remainingBytes; i++) padding.push_back(0);
+			// pad 0s for the new block
+			for (int i = 0; i < 64 - 7; i++) padding.push_back(0);
+		}
+		else {
+			// append with zeros until last 8 bytes
+			do {
+				padding.push_back(0);
+				remainingBytes--;
+			} while (remainingBytes > 7);
+		}
+
+		uint64_t length = (uint64_t)(messageSize * 8);
+		// AMD/INTEL cpus are little endian so
+		padding.push_back((length >> 48) & 0xFF);
+		padding.push_back((length >> 40) & 0xFF);
+		padding.push_back((length >> 32) & 0xFF);
+		padding.push_back((length >> 24) & 0xFF);
+		padding.push_back((length >> 16) & 0xFF);
+		padding.push_back((length >> 8) & 0xFF);
+		padding.push_back((length >> 0) & 0xFF);
+		return padding;
+	}
 
 	std::string Replace(const std::string& source, const std::string& find, const std::string& Replace)
 	{
