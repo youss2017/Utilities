@@ -1,4 +1,4 @@
-<h1>CPP Utilites</h1>
+<h1>CPP Utility</h1>
 <p>As of now some webcam have not been implemented yet for linux</p>
 <p>Note: Code structure is inspired by Nothings stb</p>
 <p>All code is cross platform</p>
@@ -12,4 +12,4 @@
 	<li>Message Boxes</li>
 </ul>
 <h3>Socket.hpp</h3>
-<p>Socket Wrapper for WINSOCK and POSIX sockets and provides some useful functions such as IsConnected</p>
+<p>Socket Wrapper for WINSOCK and POSIX sockets and provides some useful functions.</p>
