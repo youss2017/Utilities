@@ -11,6 +11,9 @@
 #include <memory>
 #include <sstream>
 #ifdef SOCKET_API_IMPLEMENTATION
+#ifndef TCP_KEEPCNT
+#define	TCP_KEEPCNT	1024
+#endif
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -124,9 +127,9 @@ namespace sw {
 		uint16_t Port = 0;
 
 		Endpoint() = default;
-		Endpoint(uint16_t Port) {
+		explicit Endpoint(uint16_t Port) {
 			Address = "0.0.0.0";
-			Port = Port;
+			this->Port = Port;
 		}
 		Endpoint(const std::string& Address, uint16_t Port) {
 			this->Address = Address;
@@ -145,11 +148,11 @@ namespace sw {
 			return { address, port };
 		}
 
-		std::string ToString() const {
+		[[nodiscard]] std::string ToString() const {
 			return Address + ":" + std::to_string(Port);
 		}
 
-		operator std::string() const {
+		explicit operator std::string() const {
 			return ToString();
 		}
 
@@ -268,15 +271,17 @@ namespace sw {
 		/// Timeout is in milliseconds
 		/// </summary>
 		/// <param name="Connections"></param>
-		void WaitForData(int32_t timeout);
+		bool WaitForData(int32_t timeout);
 		static void WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout);
 		static void WaitForData(const std::vector<std::unique_ptr<sw::Socket>>& Connections, int32_t timeout);
 		static void WaitForData(const std::vector<std::shared_ptr<sw::Socket>>& Connections, int32_t timeout);
 		static std::vector<NetworkAdapter> EnumerateNetworkAdapters();
 
-		inline bool IsBlocking() {
+		[[nodiscard]] bool IsBlocking() const {
 			return mIsBlocking;
 		}
+
+		[[nodiscard]] bool PollSocketData() { return WaitForData(0); }
 
 		bool IsConnected() const;
 
@@ -403,13 +408,14 @@ namespace sw {
 
 	Socket::~Socket()
 	{
-		if (mSocket <= 0) return;
-		Disconnect();
+		if (IsValid()) {
+			Disconnect();
 #ifdef _WIN32
-		::closesocket(mSocket);
+			::closesocket(mSocket);
 #else
-		::close(mSocket);
+			::close(mSocket);
 #endif
+		}
 	}
 
 	bool Socket::IsConnected() const {
@@ -613,11 +619,13 @@ namespace sw {
 	// Proper Disconnection.
 	Socket& Socket::Disconnect()
 	{
+		if(IsValid()) {
 #ifdef _WIN32
-		::shutdown(mSocket, SD_BOTH);
+			::shutdown(mSocket, SD_BOTH);
 #else
-		::shutdown(mSocket, SHUT_RDWR);
+			::shutdown(mSocket, SHUT_RDWR);
 #endif
+		}
 		return *this;
 	}
 
@@ -641,7 +649,7 @@ namespace sw {
 		return (mSocket > 0) && (mSocket != -1);
 	}
 
-	void Socket::WaitForData(int32_t timeout)
+	bool Socket::WaitForData(int32_t timeout)
 	{
 		pollfd fdArray{};
 		fdArray.fd = mSocket;
@@ -651,6 +659,7 @@ namespace sw {
 #else
 		poll(&fdArray, 1, timeout);
 #endif
+		return fdArray.revents & POLLRDNORM;
 	}
 
 	void Socket::WaitForData(const std::vector<sw::Socket>& Connections, int32_t timeout)
