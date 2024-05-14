@@ -493,8 +493,16 @@ namespace sw {
 	{
 		if (size == 0) return 0;
 		assert(mType == SocketType::TCP && "Must be TCP Socket to use Send Function()");
-		int32_t readBytes = ::send(mSocket, (const char*)pData, size, 0);
-		return readBytes;
+		int32_t sentBytes = ::send(mSocket, (const char*)pData, size, 0);
+        while(sentBytes < size) {
+            const int8_t* ptr = ((const int8_t*)pData) + sentBytes;
+            int32_t sentBytes2 = ::send(mSocket, (const char*)ptr, size - sentBytes, 0);
+            if(sentBytes2 == 0)
+                break;
+            if(sentBytes2 == -1)
+                continue;
+        }
+		return sentBytes;
 	}
 
 	int32_t Socket::SendTo(const void* pData, int32_t size, const std::string& destIP, uint16_t destPort)
