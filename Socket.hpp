@@ -98,6 +98,9 @@ namespace sw {
 	// Calls WSACleanup on windows
 	void CleanUp();
 
+    uint16_t HostToNetworkOrder(uint16_t hostValue);
+    uint32_t HostToNetworkOrder(uint32_t hostValue);
+
 	struct SockError {
 		int nErrorCode;
 		std::string sErrorString;
@@ -172,10 +175,11 @@ namespace sw {
 			if (IsConnected) mConnectedTimestamp = time(NULL);
 		}
 		Socket(SocketType type);
-		Socket(Socket& copy) = delete;
+		Socket(Socket& copy) = default;
 		Socket(Socket&&) noexcept;
 		Socket& operator=(Socket&&) noexcept;
-		~Socket();
+        Socket& operator=(const Socket&) = default;
+		~Socket() noexcept;
 		/// <summary>
 		/// For more information on SocketInterface go to the enum class definition.
 		/// On failure throws exception
@@ -235,6 +239,8 @@ namespace sw {
 
 		// Proper Disconnection.
 		Socket& Disconnect();
+
+        void Close();
 
 		/// <summary>
 		/// Nagle algorithim waits until the Send() packets are large enough before actually sending them.
@@ -312,6 +318,16 @@ namespace sw {
 		WSACleanup();
 #endif
 	}
+
+    uint16_t HostToNetworkOrder(uint16_t hostValue)
+    {
+        return htons(hostValue);
+    }
+
+    uint32_t HostToNetworkOrder(uint32_t hostValue)
+    {
+        return htonl(hostValue);
+    }
 
 	SockError GetLastError() {
 		SockError error;
@@ -406,8 +422,9 @@ namespace sw {
 		return *this;
 	}
 
-	Socket::~Socket()
+	Socket::~Socket() noexcept
 	{
+#if 0
 		if (IsValid()) {
 			Disconnect();
 #ifdef _WIN32
@@ -416,6 +433,7 @@ namespace sw {
 			::close(mSocket);
 #endif
 		}
+#endif
 	}
 
 	bool Socket::IsConnected() const {
@@ -581,8 +599,6 @@ namespace sw {
 
 	Socket& Socket::SetBlockingMode(bool blocking)
 	{
-		if (mIsBlocking == blocking)
-			return *this;
 		assert(mType != SocketType::RAW && "Cannot set blocking mode on RAW Socket");
 		u_long code = blocking ? 0 : 1;
 #ifdef _WIN32
@@ -628,6 +644,14 @@ namespace sw {
 		}
 		return *this;
 	}
+
+    void Socket::Close() {
+ #ifdef _WIN32
+			::closesocket(mSocket);
+#else
+			::close(mSocket);
+#endif
+        }
 
 	void Socket::SetNagleAlgorthim(bool State)
 	{

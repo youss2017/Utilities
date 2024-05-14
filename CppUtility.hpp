@@ -176,7 +176,7 @@ namespace CPP_UTILITY_NAMESPACE
 
 	namespace Base64 {
 		std::string Encode(const std::string& data);
-		std::string Encode(const unsigned char* data, size_t len);
+		std::string Encode(const uint8_t* data, size_t len);
 		std::vector<uint8_t> Decode(const std::string& input);
 		std::string DecodeString(const std::string& input);
 	};
@@ -185,7 +185,8 @@ namespace CPP_UTILITY_NAMESPACE
 	class SHA1 {
 
 	public:
-		static std::string hash(const std::vector<uint8_t>& message);
+        static std::string hash(const std::vector<uint8_t>& message);
+        static std::vector<uint32_t> hash_words(const std::vector<uint8_t>& message);
 
 		static inline constexpr uint32_t S(uint32_t X, uint8_t n) {
 			return (X << n) | (X >> 32 - n);
@@ -637,7 +638,7 @@ namespace CPP_UTILITY_NAMESPACE
 			return Encode((const unsigned char*)data.c_str(), data.length());
 		}
 
-		string Encode(const unsigned char* data, size_t len) {
+		string Encode(const uint8_t* data, size_t len) {
 			const std::string base64_chars =
 				"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 				"abcdefghijklmnopqrstuvwxyz"
@@ -647,14 +648,14 @@ namespace CPP_UTILITY_NAMESPACE
 			encoded.reserve(((len + 2) / 3) * 4);
 
 			for (size_t i = 0; i < len; i += 3) {
-				unsigned char b0 = data[i];
-				unsigned char b1 = (i + 1 < len) ? data[i + 1] : 0;
-				unsigned char b2 = (i + 2 < len) ? data[i + 2] : 0;
+				uint8_t b0 = data[i];
+				uint8_t b1 = (i + 1 < len) ? data[i + 1] : 0;
+				uint8_t b2 = (i + 2 < len) ? data[i + 2] : 0;
 
-				unsigned char enc1 = b0 >> 2;
-				unsigned char enc2 = ((b0 & 0x03) << 4) | (b1 >> 4);
-				unsigned char enc3 = ((b1 & 0x0F) << 2) | (b2 >> 6);
-				unsigned char enc4 = b2 & 0x3F;
+				uint8_t enc1 = b0 >> 2;
+				uint8_t enc2 = ((b0 & 0x03) << 4) | (b1 >> 4);
+				uint8_t enc3 = ((b1 & 0x0F) << 2) | (b2 >> 6);
+				uint8_t enc4 = b2 & 0x3F;
 
 				encoded.push_back(base64_chars[enc1]);
 				encoded.push_back(base64_chars[enc2]);
@@ -701,7 +702,7 @@ namespace CPP_UTILITY_NAMESPACE
 
 	}
 
-	string SHA1::hash(const vector<uint8_t>& message)
+	vector<uint32_t> SHA1::hash_words(const vector<uint8_t>& message)
 	{
 		uint32_t H0 = 0x67452301;
 		uint32_t H1 = 0xEFCDAB89;
@@ -754,10 +755,16 @@ namespace CPP_UTILITY_NAMESPACE
 			H3 = H3 + D;
 			H4 = H4 + E;
 		}
-		char szBuf[10 * 8];
-		sprintf(szBuf, "%08x%08x%08x%08x%08x", H0, H1, H2, H3, H4);
-		return szBuf;
+        return { H0, H1, H2, H3, H4 };
+
 	}
+
+    std::string SHA1::hash(const std::vector<uint8_t>& message) {
+        auto words = hash_words(message);
+        char szBuf[10 * 8];
+        sprintf(szBuf, "%08x%08x%08x%08x%08x", words[0], words[1], words[2], words[3], words[4]);
+        return szBuf;
+    }
 
 	vector<uint8_t> SHA1::_pad_message(size_t messageSize) {
 		vector<uint8_t> padding;
