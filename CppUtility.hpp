@@ -11,6 +11,7 @@
 #include <cstring>
 #include <chrono>
 #include <stdexcept>
+#include <optional>
 
 #ifndef CPP_UTILITY_NAMESPACE
 #define CPP_UTILITY_NAMESPACE cpp
