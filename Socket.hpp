@@ -126,12 +126,11 @@ namespace sw {
 	};
 
 	struct Endpoint {
-		std::string Address;
+		std::string Address = "0.0.0.0";
 		uint16_t Port = 0;
 
 		Endpoint() = default;
 		explicit Endpoint(uint16_t Port) {
-			Address = "0.0.0.0";
 			this->Port = Port;
 		}
 		Endpoint(const std::string& Address, uint16_t Port) {
@@ -176,10 +175,9 @@ namespace sw {
 		}
 		Socket(SocketType type);
 		Socket(Socket& copy) = default;
-		Socket(Socket&&) noexcept;
-		Socket& operator=(Socket&&) noexcept;
+		Socket(Socket&&) noexcept = default;
+		Socket& operator=(Socket&&) noexcept = default;
         Socket& operator=(const Socket&) = default;
-		~Socket() noexcept;
 		/// <summary>
 		/// For more information on SocketInterface go to the enum class definition.
 		/// On failure throws exception
@@ -405,35 +403,6 @@ namespace sw {
 		mEndpoint.Address = "0.0.0.0";
 		if (mSocket < 0)
 			Socket_ThrowException();
-	}
-
-	Socket::Socket(Socket&& move) noexcept
-	{
-		this->~Socket();
-		memcpy(this, &move, sizeof(Socket));
-		memset(&move, 0, sizeof(Socket));
-	}
-
-	Socket& Socket::operator=(Socket&& move) noexcept
-	{
-		this->~Socket();
-		memcpy(this, &move, sizeof(Socket));
-		memset(&move, 0, sizeof(Socket));
-		return *this;
-	}
-
-	Socket::~Socket() noexcept
-	{
-#if 0
-		if (IsValid()) {
-			Disconnect();
-#ifdef _WIN32
-			::closesocket(mSocket);
-#else
-			::close(mSocket);
-#endif
-		}
-#endif
 	}
 
 	bool Socket::IsConnected() const {
