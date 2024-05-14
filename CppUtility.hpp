@@ -128,7 +128,7 @@ namespace NMB
 			return NMB::Result::CANCEL;
 
 #elif defined(__linux__)
-
+/*
 		GtkMessageType gtk_message_type;
 
 		switch (icon)
@@ -152,7 +152,8 @@ namespace NMB
 			return NMB::Result::OK;
 		else
 			return NMB::Result::CANCEL;
-
+*/
+    return NMB::Result::CANCEL;
 #else
 
 #error "Platform not supported!"
