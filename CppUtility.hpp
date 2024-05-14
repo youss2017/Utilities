@@ -41,6 +41,7 @@
 #include <windows.h>
 #else
 #include <signal.h>
+#include <syscall.h>
 #endif
 #include <signal.h>
 #include <regex>
@@ -558,7 +559,7 @@ namespace CPP_UTILITY_NAMESPACE
 					strftime(currentTime, 80, "%H:%M:%S %p", localtime(&rawTime));
 				}
 			}
-			double timeSinceStart = double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - _start_timestamp).count()) * 1e-9;
+			double timeSinceStart = double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - _start_timestamp).count()) * 1e-9;
 			uint64_t threadId = _get_current_thread_id();
 			std::string result;
 			FileName = FileName ? FileName : ".";
@@ -1300,11 +1301,11 @@ namespace CPP_UTILITY_NAMESPACE
 #ifdef _WIN32
 		return GetCurrentThreadId();
 #else
-#error "Not Implemented"
+        return syscall(__NR_gettid);
 #endif
 	}
 
-	std::chrono::steady_clock::time_point Logger::_start_timestamp = std::chrono::high_resolution_clock::now();
+	std::chrono::steady_clock::time_point Logger::_start_timestamp = std::chrono::steady_clock::now();
 	LoggerOptions Logger::GlobalLoggerOptions;
 
 #endif
