@@ -618,7 +618,7 @@ namespace sw {
 		sockaddr_in addrs{};
 		socklen_t len = sizeof(sockaddr_in);
 		uint64_t client = (uint64_t)::accept(mSocket, (sockaddr*)&addrs, &len);
-		if (client <= 0)
+		if (client == UINT64_MAX)
 		{
 			return Socket(0, sw::SocketType::TCP, { "0.0.0.0", 0 }, false);
 		}
