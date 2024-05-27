@@ -82,7 +82,7 @@ namespace VIDEO_CAPTURE_NAMESPACE {
 	};
 
 #ifdef VIDEO_CAPTURE_IMPLEMENTATION
-#ifdef _WIN32
+        #ifdef _WIN32
 	using namespace Microsoft::WRL;
 
 	bool LoadCOM() {

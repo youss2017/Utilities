@@ -90,7 +90,7 @@ void sw_socket_set_blockingmode(s_socket* socket, bool blocking_mode);
 void sw_set_nagle_algorthim(s_socket* socket, bool State);
 
 /// <summary>
-/// Sends TCP Packets (does not affect client/server application)
+/// Sends TCP Packets (does not affect client/m_server application)
 /// to check connection state (in case the application didn't have a proper disconnection)
 /// </summary>
 /// <param name="State">Enable/Disable</param>

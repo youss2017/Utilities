@@ -12,6 +12,8 @@
 #include <chrono>
 #include <stdexcept>
 #include <optional>
+#include <functional>
+#include <thread>
 
 #ifndef CPP_UTILITY_NAMESPACE
 #define CPP_UTILITY_NAMESPACE cpp
@@ -40,6 +42,8 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 #else
 #include <signal.h>
 #include <syscall.h>
@@ -226,8 +230,123 @@ namespace CPP_UTILITY_NAMESPACE
 		uint32_t H4 = 0xC3D2E1F0;
 	};
 
+    enum class StopWatchEvent {
+        Continue,
+        Stop
+    };
 
+    class StopWatch {
+    public:
+        StopWatch() {
+            Reset();
+        }
 
+        inline void Reset() {
+            StartMeasurement = StopMeasurement = std::chrono::high_resolution_clock::now();
+        }
+
+        inline size_t Stop() {
+            StopMeasurement = std::chrono::high_resolution_clock::now();
+            return (StopMeasurement - StartMeasurement).count();
+        }
+
+        inline double TimeAsSeconds() const {
+            return (StopMeasurement - StartMeasurement).count() * 1e-9;
+        }
+
+        inline double TimeAsMilliseconds() const {
+            return (StopMeasurement - StartMeasurement).count() * 1e-6;
+        }
+
+        inline double TimeAsMicroseconds() const {
+            return (StopMeasurement - StartMeasurement).count() * 1e-3;
+        }
+
+        inline size_t TimeAsNanoseconds() const {
+            return (StopMeasurement - StartMeasurement).count();
+        }
+
+        inline double RatePerSecond() const {
+            return 1e9 / double(TimeAsNanoseconds());
+        }
+
+        inline bool TriggerSeconds(double seconds) {
+            auto time_point = std::chrono::high_resolution_clock::now();
+            if ((time_point - StartMeasurement).count() >= (seconds * 1e9)) {
+                StartMeasurement = time_point;
+                return true;
+            }
+            return false;
+        }
+
+        inline bool TriggerMilliseconds(double milliseconds) {
+            auto time_point = std::chrono::high_resolution_clock::now();
+            if ((time_point - StartMeasurement).count() >= (milliseconds * 1e6)) {
+                StartMeasurement = time_point;
+                return true;
+            }
+            return false;
+        }
+
+        inline bool TriggerMicroseconds(double microseconds) {
+            auto time_point = std::chrono::high_resolution_clock::now();
+            if ((time_point - StartMeasurement).count() >= (microseconds * 1e3)) {
+                StartMeasurement = time_point;
+                return true;
+            }
+            return false;
+        }
+
+        static void CreateEventCallback(double seconds, const std::function<StopWatchEvent()>& callback, bool spin_wait = false) {
+            auto nanoseconds = uint64_t(seconds * 1.0e9);
+            CreateEventCallback(std::chrono::nanoseconds (nanoseconds), callback, spin_wait);
+        }
+
+        template<typename Rep, typename Period>
+        static void CreateEventCallback(std::chrono::duration<Rep, Period> duration, const std::function<StopWatchEvent()>& callback, bool spin_wait = false) {
+            if(spin_wait) {
+                auto thread = std::thread([=] {
+                    StopWatchEvent recursive;
+                    do {
+                        auto future_timepoint = std::chrono::high_resolution_clock::now() + duration;
+                        while(std::chrono::high_resolution_clock::now() < future_timepoint) {}
+                        recursive = callback();
+                    } while (recursive == StopWatchEvent::Continue);
+                });
+                thread.detach();
+            } else {
+                auto thread = std::thread([=] {
+                    StopWatchEvent recursive;
+                    do {
+                        std::this_thread::sleep_for(duration);
+                        recursive = callback();
+                    } while (recursive == StopWatchEvent::Continue);
+                });
+                thread.detach();
+            }
+        }
+
+        template<typename Rep, typename Period>
+        static inline void SpinWait(std::chrono::duration<Rep, Period> duration) {
+            auto future_timepoint = std::chrono::high_resolution_clock::now() + duration;
+            while(std::chrono::high_resolution_clock::now() < future_timepoint) {}
+        }
+
+        static inline void SpinWait(double seconds) {
+            auto nanoseconds = uint64_t(seconds * 1.0e9);
+            SpinWait(std::chrono::nanoseconds(nanoseconds));
+        }
+
+    public:
+        std::chrono::steady_clock::time_point StartMeasurement;
+        std::chrono::steady_clock::time_point StopMeasurement;
+    };
+
+    std::string FriendlyMemorySize(double size);
+
+    void EnableUTF8();
+    uint64_t GetFileSize(const std::string& filePath);
+    uint64_t GetCurrentThreadId();
 	void DebugBreak();
 
 	void ShowInfoBox(const std::string& title, const std::string& text);
@@ -562,7 +681,7 @@ namespace CPP_UTILITY_NAMESPACE
 				}
 			}
 			double timeSinceStart = double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - _start_timestamp).count()) * 1e-9;
-			uint64_t threadId = _get_current_thread_id();
+			uint64_t threadId = GetCurrentThreadId();
 			std::string result;
 			FileName = FileName ? FileName : ".";
 			char fileAndNumber[125]{};
@@ -625,7 +744,6 @@ namespace CPP_UTILITY_NAMESPACE
 
 	private:
 		void _internal_log(LogLevel logLevel, const std::string& input);
-		uint64_t _get_current_thread_id();
 
 	private:
 		std::fstream _file_stream;
@@ -635,6 +753,41 @@ namespace CPP_UTILITY_NAMESPACE
 #ifdef CPP_UTILITY_IMPLEMENTATION
 	using namespace std;
 	static std::mutex _console_lock;
+
+    std::string FriendlyMemorySize(double size) {
+        int i = 0;
+        if(size >= 1024) { size /= 1024.0; i = 1; }
+        if(size >= 1024) { size /= 1024.0; i = 2; }
+        if(size >= 1024) { size /= 1024.0; i = 3; }
+        const char* suffix[] = { "b", "kb", "mb", "gb" };
+        std::stringstream out;
+        out << std::fixed << std::setprecision(2) << size << ' ' << suffix[i];
+        return out.str();
+    }
+
+    void EnableUTF8() {
+#ifdef _WIN32
+    // Set console code page to UTF-8 so console known how to interpret string data
+    SetConsoleOutputCP(CP_UTF8);
+#endif
+    }
+
+    uint64_t GetFileSize(const std::string& filePath)
+    {
+#ifdef _WIN32
+        LARGE_INTEGER size;
+        HANDLE handle = CreateFileA(filePath.c_str(), GENERIC_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if(handle == INVALID_HANDLE_VALUE)
+            return UINT64_MAX;
+        GetFileSizeEx(handle, &size);
+        CloseHandle(handle);
+        return size.QuadPart;
+#else
+#error "TODO: Implement GetFileSize"
+#endif
+    }
 
 	namespace Base64 {
 		string Encode(const string& data) {
@@ -806,6 +959,15 @@ namespace CPP_UTILITY_NAMESPACE
 		padding.push_back((length >> 0) & 0xFF);
 		return padding;
 	}
+
+    uint64_t GetCurrentThreadId()
+    {
+#ifdef _WIN32
+		return ::GetCurrentThreadId();
+#else
+        return syscall(__NR_gettid);
+#endif
+    }
 
 	std::string Replace(const std::string& source, const std::string& find, const std::string& Replace)
 	{
@@ -1294,18 +1456,10 @@ namespace CPP_UTILITY_NAMESPACE
 
 	void Logger::AddFileLogging(const char* FileName)
 	{
-		_file_stream = std::fstream(FileName, std::ios::out);
+		_file_stream = std::fstream(FileName, std::fstream::out | std::fstream::app);
 		Options.LoggerType |= LOGGER_TYPE_FILE;
 	}
 
-	uint64_t Logger::_get_current_thread_id()
-	{
-#ifdef _WIN32
-		return GetCurrentThreadId();
-#else
-        return syscall(__NR_gettid);
-#endif
-	}
 
 	std::chrono::steady_clock::time_point Logger::_start_timestamp = std::chrono::steady_clock::now();
 	LoggerOptions Logger::GlobalLoggerOptions;

@@ -37,7 +37,7 @@
 #include <iostream>
 #include <sstream>
 #include <cassert>
-
+#include <chrono>
 #ifdef _WIN32
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "Iphlpapi.lib")
@@ -101,6 +101,8 @@ namespace sw {
     uint16_t HostToNetworkOrder(uint16_t hostValue);
     uint32_t HostToNetworkOrder(uint32_t hostValue);
 
+    bool IsValidIPv4(const std::string& ip);
+
 	struct SockError {
 		int nErrorCode;
 		std::string sErrorString;
@@ -118,7 +120,7 @@ namespace sw {
 	enum class SocketInterface {
 		// 127.*.*.* packets only from your computer
 		Loopback,
-		// Binds to all interfaces best option for server
+		// Binds to all interfaces best option for m_server
 		Any,
 		// You enter interface address in bind function
 		// ex: 127.0.0.1, 192.168.1.50
@@ -249,7 +251,7 @@ namespace sw {
 		void SetNagleAlgorthim(bool State);
 
 		/// <summary>
-		/// Sends TCP Packets (does not affect client/server application)
+		/// Sends TCP Packets (does not affect client/m_server application)
 		/// to check connection state (in case the application didn't have a proper disconnection)
 		/// </summary>
 		/// <param name="State">Enable/Disable</param>
@@ -290,7 +292,7 @@ namespace sw {
 		bool IsConnected() const;
 
 		constexpr uint64_t SockFd() const { return mSocket; }
-		// time(NULL) when connection was established
+		// steady_clock::now().time_since_epoch().count() when connection was established
 		constexpr uint64_t ConnectedTimestamp() const { return mConnectedTimestamp; }
 
 	private:
@@ -325,6 +327,13 @@ namespace sw {
     uint32_t HostToNetworkOrder(uint32_t hostValue)
     {
         return htonl(hostValue);
+    }
+
+    bool IsValidIPv4(const std::string& ip)
+    {
+        struct sockaddr_in sa;
+        int result = inet_pton(AF_INET, ip.c_str(), &(sa.sin_addr));
+        return result != 0;
     }
 
 	SockError GetLastError() {
@@ -419,7 +428,7 @@ namespace sw {
 		if (query.revents & POLLHUP) {
 			return false;
 		}
-		return true;
+		return true && mConnectedTimestamp != 0;
 	}
 
 	// Throws Exception on failure
@@ -471,7 +480,7 @@ namespace sw {
 		addr.sin_family = AF_INET;
 		if (::connect(mSocket, (sockaddr*)&addr, sizeof(addr)) == 0)
 		{
-			mConnectedTimestamp = time(NULL);
+			mConnectedTimestamp = std::chrono::steady_clock::now().time_since_epoch().count();
 		}
 		else {
 			mConnectedTimestamp = 0;
@@ -499,8 +508,9 @@ namespace sw {
             int32_t sentBytes2 = ::send(mSocket, (const char*)ptr, size - sentBytes, 0);
             if(sentBytes2 == 0)
                 break;
-            if(sentBytes2 == -1)
+            if(sentBytes2 == -1 && IsConnected())
                 continue;
+            sentBytes += sentBytes2;
         }
 		return sentBytes;
 	}
@@ -628,6 +638,7 @@ namespace sw {
 #else
 			::close(mSocket);
 #endif
+            mSocket = UINT64_MAX;
         }
 
 	void Socket::SetNagleAlgorthim(bool State)
