@@ -31,7 +31,8 @@
 #endif
 
 #ifndef LOGGER_DISABLE_LOGGING
-#define LOG(logLevel, x, ...) CPP_UTILITY_NAMESPACE ::Logger::GetGlobalLogger().print(CPP_UTILITY_NAMESPACE ::LogLevel::logLevel, __FILENAME__, __LINE__,  x, __VA_ARGS__)
+//#define LOG(logLevel, x, ...) CPP_UTILITY_NAMESPACE ::Logger::GetGlobalLogger().print(CPP_UTILITY_NAMESPACE ::LogLevel::logLevel, __FILENAME__, __LINE__,  x, __VA_ARGS__+0)
+#define LOG(logLevel, x, ...)
 #else
 #define LOG(logLevel, x, ...)
 #endif
@@ -47,6 +48,8 @@
 #else
 #include <signal.h>
 #include <syscall.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 #include <signal.h>
 #include <regex>
@@ -163,6 +166,7 @@ namespace NMB
 #error "Platform not supported!"
 
 #endif
+    return NMB::Result::CANCEL;
 	}
 
 }
@@ -338,8 +342,8 @@ namespace CPP_UTILITY_NAMESPACE
         }
 
     public:
-        std::chrono::steady_clock::time_point StartMeasurement;
-        std::chrono::steady_clock::time_point StopMeasurement;
+        std::chrono::high_resolution_clock::time_point StartMeasurement;
+        std::chrono::high_resolution_clock::time_point StopMeasurement;
     };
 
     std::string FriendlyMemorySize(double size);
@@ -785,7 +789,11 @@ namespace CPP_UTILITY_NAMESPACE
         CloseHandle(handle);
         return size.QuadPart;
 #else
-#error "TODO: Implement GetFileSize"
+    struct stat64 fileStat;
+    if (stat64(filePath.c_str(), &fileStat) == -1) {
+        return UINT64_MAX;
+    }
+    return fileStat.st_size;
 #endif
     }
 
